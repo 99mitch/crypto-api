@@ -47,12 +47,12 @@ export default function CreatePaymentModal({ onClose }) {
       data-testid="modal-backdrop"
       onClick={e => { if (e.target === e.currentTarget && !submitting) onClose() }}
     >
-      <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-md mx-4 p-6">
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 w-full max-w-md mx-4 p-6">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-gray-100">New Payment</h2>
+          <h2 className="text-base font-semibold text-zinc-100">New Payment</h2>
           <button
             onClick={() => { if (!submitting) onClose() }}
-            className="text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-zinc-500 hover:text-zinc-300 transition-colors"
             aria-label="Close"
           >
             <X size={18} />
@@ -61,7 +61,7 @@ export default function CreatePaymentModal({ onClose }) {
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Amount (USDT) *</label>
+            <label className="block text-sm text-zinc-400 mb-1">Amount (USDT) *</label>
             <input
               type="number"
               value={amount}
@@ -69,19 +69,19 @@ export default function CreatePaymentModal({ onClose }) {
               min="0.01"
               step="0.01"
               placeholder="0.00"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-600"
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-400"
               autoFocus
             />
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Description</label>
+            <label className="block text-sm text-zinc-400 mb-1">Description</label>
             <input
               type="text"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Order ref, customer name…"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-emerald-600"
+              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-400"
             />
           </div>
 
@@ -93,14 +93,14 @@ export default function CreatePaymentModal({ onClose }) {
             <button
               type="button"
               onClick={() => { if (!submitting) onClose() }}
-              className="flex-1 px-4 py-2 text-sm text-gray-400 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+              className="flex-1 px-4 py-2 text-sm text-zinc-400 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 px-4 py-2 text-sm font-medium border border-zinc-100 text-zinc-100 rounded-lg hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {submitting ? 'Creating…' : 'Create Payment'}
             </button>

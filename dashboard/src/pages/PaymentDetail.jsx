@@ -9,7 +9,7 @@ import { formatUSDT, formatDateTime } from '../utils/formatters'
 function Toast({ message, type }) {
   return (
     <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-lg text-sm font-medium shadow-lg z-50 ${
-      type === 'error' ? 'bg-rose-900 text-rose-100 border border-rose-700' : 'bg-emerald-900 text-emerald-100 border border-emerald-700'
+      type === 'error' ? 'bg-rose-900 text-rose-100 border border-rose-700' : 'bg-zinc-800 text-zinc-100 border border-zinc-700'
     }`}>
       {message}
     </div>
@@ -19,9 +19,9 @@ function Toast({ message, type }) {
 function DetailRow({ label, value }) {
   if (value == null || value === '' || value === null) return null
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2.5 border-b border-gray-800 last:border-0">
-      <span className="text-gray-500 text-sm sm:w-40 shrink-0">{label}</span>
-      <span className="text-gray-200 text-sm font-mono break-all">{String(value)}</span>
+    <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2.5 border-b border-zinc-800 last:border-0">
+      <span className="text-zinc-500 text-sm sm:w-40 shrink-0">{label}</span>
+      <span className="text-zinc-200 text-sm font-mono break-all">{String(value)}</span>
     </div>
   )
 }
@@ -73,8 +73,8 @@ export default function PaymentDetail() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="h-8 w-48 bg-gray-800 rounded animate-pulse" />
-        <div className="bg-gray-900 rounded-xl border border-gray-800 h-64 animate-pulse" />
+        <div className="h-8 w-48 bg-zinc-800 rounded animate-pulse" />
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 h-64 animate-pulse" />
       </div>
     )
   }
@@ -89,11 +89,11 @@ export default function PaymentDetail() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate('/payments')}
-          className="p-1.5 text-gray-400 hover:text-gray-100 hover:bg-gray-800 rounded-lg transition-colors"
+          className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
         >
           <ArrowLeft size={18} />
         </button>
-        <h1 className="text-lg font-semibold text-gray-100 font-mono">{payment.paymentId}</h1>
+        <h1 className="text-lg font-semibold text-zinc-100 font-mono">{payment.paymentId}</h1>
         <StatusBadge status={payment.status} />
         {payment.sweepStatus === 'failed' && (
           <button
@@ -108,8 +108,8 @@ export default function PaymentDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Payment info */}
-        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
-          <h2 className="text-sm font-medium text-gray-300 mb-3">Payment Details</h2>
+        <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
+          <h2 className="text-sm font-medium text-zinc-300 mb-3">Payment Details</h2>
           <div>
             <DetailRow label="Amount" value={formatUSDT(payment.amount)} />
             <DetailRow label="Received" value={payment.receivedAmount ? formatUSDT(payment.receivedAmount) : null} />
@@ -128,8 +128,8 @@ export default function PaymentDetail() {
           </div>
           {payment.metadata && Object.keys(payment.metadata).length > 0 && (
             <div className="mt-3">
-              <p className="text-gray-500 text-sm mb-1">Metadata</p>
-              <pre className="text-xs bg-gray-950 rounded p-2 text-gray-300 overflow-x-auto">
+              <p className="text-zinc-500 text-sm mb-1">Metadata</p>
+              <pre className="text-xs bg-zinc-950 rounded p-2 text-zinc-300 overflow-x-auto">
                 {JSON.stringify(payment.metadata, null, 2)}
               </pre>
             </div>
@@ -138,21 +138,21 @@ export default function PaymentDetail() {
 
         {/* QR Code */}
         {payment.qrCode && (
-          <div className="bg-gray-900 rounded-xl p-5 border border-gray-800 flex flex-col items-center justify-center">
-            <h2 className="text-sm font-medium text-gray-300 mb-4 self-start">Payment QR Code</h2>
+          <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 flex flex-col items-center justify-center">
+            <h2 className="text-sm font-medium text-zinc-300 mb-4 self-start">Payment QR Code</h2>
             <img
               src={payment.qrCode}
               alt="Payment QR Code"
               className="w-48 h-48 rounded-lg"
             />
-            <p className="text-xs text-gray-500 mt-3 text-center break-all font-mono">{payment.walletAddress}</p>
+            <p className="text-xs text-zinc-500 mt-3 text-center break-all font-mono">{payment.walletAddress}</p>
           </div>
         )}
       </div>
 
       {/* Audit Timeline */}
-      <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
-        <h2 className="text-sm font-medium text-gray-300 mb-5">Audit Trail</h2>
+      <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
+        <h2 className="text-sm font-medium text-zinc-300 mb-5">Audit Trail</h2>
         <AuditTimeline history={history} />
       </div>
 
