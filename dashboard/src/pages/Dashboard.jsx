@@ -42,7 +42,8 @@ function useDashboard() {
     const fetchChartData = async () => {
       const days = Array.from({ length: 7 }, (_, i) => {
         const d = new Date()
-        d.setDate(d.getDate() - (6 - i))
+        d.setUTCHours(0, 0, 0, 0)
+        d.setUTCDate(d.getUTCDate() - (6 - i))
         return d
       })
       try {
@@ -174,7 +175,7 @@ export default function Dashboard() {
                   </div>
                   <div className="w-full bg-zinc-800 rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full ${colors.dot}`}
+                      className={`h-2 rounded-full ${colors.bar}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>

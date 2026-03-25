@@ -1,10 +1,10 @@
 export const STATUS_COLORS = {
-  swept:      { bg: 'bg-zinc-100',                          text: 'text-zinc-900', dot: 'bg-zinc-900' },
-  confirmed:  { bg: 'bg-zinc-800 border border-zinc-700',   text: 'text-zinc-200', dot: 'bg-zinc-200' },
-  confirming: { bg: 'bg-zinc-800 border border-zinc-700',   text: 'text-zinc-300', dot: 'bg-zinc-400' },
-  pending:    { bg: 'bg-zinc-900 border border-zinc-700',   text: 'text-zinc-400', dot: 'bg-zinc-500' },
-  expired:    { bg: 'bg-zinc-900 border border-zinc-800',   text: 'text-zinc-500', dot: 'bg-zinc-600' },
-  failed:     { bg: 'bg-rose-950 border border-rose-900',   text: 'text-rose-400', dot: 'bg-rose-500' },
+  swept:      { bg: 'bg-zinc-100',                          text: 'text-zinc-900', dot: 'bg-zinc-900', bar: 'bg-zinc-100' },
+  confirmed:  { bg: 'bg-zinc-800 border border-zinc-700',   text: 'text-zinc-200', dot: 'bg-zinc-200', bar: 'bg-zinc-200' },
+  confirming: { bg: 'bg-zinc-800 border border-zinc-700',   text: 'text-zinc-300', dot: 'bg-zinc-400', bar: 'bg-zinc-400' },
+  pending:    { bg: 'bg-zinc-900 border border-zinc-700',   text: 'text-zinc-400', dot: 'bg-zinc-500', bar: 'bg-zinc-500' },
+  expired:    { bg: 'bg-zinc-900 border border-zinc-800',   text: 'text-zinc-500', dot: 'bg-zinc-600', bar: 'bg-zinc-600' },
+  failed:     { bg: 'bg-rose-950 border border-rose-900',   text: 'text-rose-400', dot: 'bg-rose-500', bar: 'bg-rose-500' },
 }
 
 export const LEVEL_COLORS = {
