@@ -7,7 +7,7 @@ import { formatDateTime, getDayRange } from '../utils/formatters'
 import { ACTION_ENUM, LEVEL_COLORS } from '../constants'
 
 const LEVEL_OPTIONS = Object.keys(LEVEL_COLORS)
-const FILTER_CLS = 'px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600'
+const FILTER_CLS = 'px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 focus:outline-none focus:border-zinc-400'
 
 export default function AuditLogs() {
   const navigate = useNavigate()
@@ -48,7 +48,7 @@ export default function AuditLogs() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-gray-100">Audit Logs</h1>
+      <h1 className="text-xl font-semibold text-zinc-100">Audit Logs</h1>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
@@ -87,12 +87,12 @@ export default function AuditLogs() {
       </div>
 
       {/* Table */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         {error && <p className="p-4 text-rose-400 text-sm">{error}</p>}
 
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-800 text-gray-400 text-left">
+            <tr className="border-b border-zinc-800 text-zinc-400 text-left">
               <th className="px-4 py-3 font-medium">Timestamp</th>
               <th className="px-4 py-3 font-medium">Action</th>
               <th className="px-4 py-3 font-medium">Level</th>
@@ -103,31 +103,31 @@ export default function AuditLogs() {
           <tbody>
             {loading
               ? [...Array(8)].map((_, i) => (
-                  <tr key={i} className="border-b border-gray-800">
+                  <tr key={i} className="border-b border-zinc-800">
                     {[...Array(5)].map((_, j) => (
                       <td key={j} className="px-4 py-3">
-                        <div className="h-4 bg-gray-800 rounded animate-pulse" />
+                        <div className="h-4 bg-zinc-800 rounded animate-pulse" />
                       </td>
                     ))}
                   </tr>
                 ))
               : logs.map((log, i) => (
-                  <tr key={log._id ?? i} className="border-b border-gray-800 hover:bg-gray-800/40 transition-colors">
-                    <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
-                    <td className="px-4 py-3 text-gray-300 font-mono text-xs">{log.action}</td>
+                  <tr key={log._id ?? i} className="border-b border-zinc-800 hover:bg-zinc-800/40 transition-colors">
+                    <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
+                    <td className="px-4 py-3 text-zinc-300 font-mono text-xs">{log.action}</td>
                     <td className="px-4 py-3"><StatusBadge level={log.level} /></td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       {log.paymentId
                         ? <button
                             onClick={() => navigate(`/payments/${log.paymentId}`)}
-                            className="text-emerald-400 hover:text-emerald-300 font-mono text-xs transition-colors"
+                            className="text-zinc-300 hover:text-zinc-100 font-mono text-xs transition-colors"
                           >
                             {log.paymentId}
                           </button>
-                        : <span className="text-gray-600">&mdash;</span>
+                        : <span className="text-zinc-600">&mdash;</span>
                       }
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs hidden xl:table-cell">{log.ip ?? '—'}</td>
+                    <td className="px-4 py-3 text-zinc-500 text-xs hidden xl:table-cell">{log.ip ?? '—'}</td>
                   </tr>
                 ))
             }
@@ -135,12 +135,12 @@ export default function AuditLogs() {
         </table>
 
         {!loading && logs.length === 0 && !error && (
-          <p className="p-6 text-center text-gray-500 text-sm">No logs found.</p>
+          <p className="p-6 text-center text-zinc-500 text-sm">No logs found.</p>
         )}
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-400">{total} total logs</p>
+        <p className="text-sm text-zinc-400">{total} total logs</p>
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </div>
     </div>
