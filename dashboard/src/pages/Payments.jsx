@@ -46,10 +46,10 @@ export default function Payments() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-100">Payments</h1>
+        <h1 className="text-xl font-semibold text-zinc-100">Payments</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors"
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium border border-zinc-100 text-zinc-100 rounded-lg hover:bg-zinc-100 hover:text-zinc-950 transition-colors"
         >
           <Plus size={16} />
           New Payment
@@ -61,7 +61,7 @@ export default function Payments() {
         <select
           value={filters.status}
           onChange={e => handleFilterChange('status', e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600"
+          className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 focus:outline-none focus:border-zinc-400"
         >
           <option value="">All statuses</option>
           {STATUS_OPTIONS.filter(Boolean).map(s => (
@@ -72,23 +72,23 @@ export default function Payments() {
           type="date"
           value={filters.from}
           onChange={e => handleFilterChange('from', e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600"
+          className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 focus:outline-none focus:border-zinc-400"
         />
         <input
           type="date"
           value={filters.to}
           onChange={e => handleFilterChange('to', e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600"
+          className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 focus:outline-none focus:border-zinc-400"
         />
       </div>
 
       {/* Table */}
-      <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+      <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
         {error && <p className="p-4 text-rose-400 text-sm">{error}</p>}
 
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-800 text-gray-400 text-left">
+            <tr className="border-b border-zinc-800 text-zinc-400 text-left">
               <th className="px-4 py-3 font-medium">Payment ID</th>
               <th className="px-4 py-3 font-medium">Amount</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -99,10 +99,10 @@ export default function Payments() {
           <tbody>
             {loading
               ? [...Array(5)].map((_, i) => (
-                  <tr key={i} className="border-b border-gray-800">
+                  <tr key={i} className="border-b border-zinc-800">
                     {[...Array(5)].map((_, j) => (
                       <td key={j} className="px-4 py-3">
-                        <div className="h-4 bg-gray-800 rounded animate-pulse" />
+                        <div className="h-4 bg-zinc-800 rounded animate-pulse" />
                       </td>
                     ))}
                   </tr>
@@ -111,13 +111,13 @@ export default function Payments() {
                   <tr
                     key={p.paymentId}
                     onClick={() => navigate(`/payments/${p.paymentId}`)}
-                    className="border-b border-gray-800 hover:bg-gray-800/50 cursor-pointer transition-colors"
+                    className="border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono text-gray-300 truncate max-w-xs">{p.paymentId}</td>
-                    <td className="px-4 py-3 text-gray-300">{formatUSDT(p.amount)}</td>
+                    <td className="px-4 py-3 font-mono text-zinc-300 truncate max-w-xs">{p.paymentId}</td>
+                    <td className="px-4 py-3 text-zinc-300">{formatUSDT(p.amount)}</td>
                     <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
-                    <td className="px-4 py-3 text-gray-400 hidden md:table-cell">{formatDateTime(p.createdAt)}</td>
-                    <td className="px-4 py-3 text-gray-400 hidden md:table-cell">{formatDateTime(p.updatedAt)}</td>
+                    <td className="px-4 py-3 text-zinc-400 hidden md:table-cell">{formatDateTime(p.createdAt)}</td>
+                    <td className="px-4 py-3 text-zinc-400 hidden md:table-cell">{formatDateTime(p.updatedAt)}</td>
                   </tr>
                 ))
             }
@@ -125,12 +125,12 @@ export default function Payments() {
         </table>
 
         {!loading && payments.length === 0 && !error && (
-          <p className="p-6 text-center text-gray-500 text-sm">No payments found.</p>
+          <p className="p-6 text-center text-zinc-500 text-sm">No payments found.</p>
         )}
       </div>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-400">{total} total payments</p>
+        <p className="text-sm text-zinc-400">{total} total payments</p>
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </div>
 
