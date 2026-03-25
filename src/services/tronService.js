@@ -84,22 +84,27 @@ class TronService {
       if (!response || !response.data) return [];
 
       return response.data
-        .filter((tx) => tx.to === address && tx.token_info?.address === this.usdtContract)
+        .filter((tx) => tx.token_info?.address === this.usdtContract)
         .map((tx) => {
-          // tx.from peut être en hex (41...) ou base58 (T...) selon la version TronGrid
+          // tx.from et tx.to peuvent être en hex (41...) ou base58 (T...) selon la version TronGrid
           let from = tx.from;
           if (from && from.startsWith('41')) {
             try { from = TronWeb.address.fromHex(from); } catch (_) {}
           }
+          let to = tx.to;
+          if (to && to.startsWith('41')) {
+            try { to = TronWeb.address.fromHex(to); } catch (_) {}
+          }
           return {
             txHash: tx.transaction_id,
             from,
-            to: tx.to,
+            to,
             amount: Number(tx.value) / 1e6,
             timestamp: tx.block_timestamp,
             confirmed: tx.confirmed ?? true,
           };
-        });
+        })
+        .filter((tx) => tx.to === address);
     } catch (error) {
       console.error(`Erreur getIncomingUSDTTransactions pour ${address}:`, error.message);
       return [];
@@ -128,39 +133,46 @@ class TronService {
   }
 
   /**
-   * Sweep : transfère les USDT d'un wallet généré vers le wallet central
+   * Prépare le gas TRX pour couvrir N transferts depuis un wallet
+   * @param {string} fromAddress
+   * @param {number} nbTransfers - Nombre de transferts prévus (pour estimer le gas)
+   */
+  async ensureGasForSweep(fromAddress, nbTransfers = 1) {
+    const trxBalance = await this.getTRXBalance(fromAddress);
+    const required = (config.sweep.minTrxForGas * nbTransfers) / 1e6;
+    if (trxBalance < required) {
+      console.log(`⛽ Envoi de TRX pour gas à ${fromAddress}...`);
+      await this.sendTRXForGas(fromAddress, config.sweep.minTrxForGas * nbTransfers);
+      await this._sleep(5000);
+    }
+  }
+
+  /**
+   * Transfert USDT depuis un wallet vers une destination
    * @param {string} fromPrivateKey - Clé privée du wallet source
    * @param {string} fromAddress - Adresse source
    * @param {number} amount - Montant USDT à transférer
+   * @param {string} toAddress - Adresse de destination
    * @returns {string} Hash de la transaction
    */
-  async sweepUSDT(fromPrivateKey, fromAddress, amount) {
+  async sweepUSDT(fromPrivateKey, fromAddress, amount, toAddress) {
     try {
-      // 1. Vérifier le solde TRX pour le gas
-      const trxBalance = await this.getTRXBalance(fromAddress);
-      if (trxBalance < config.sweep.minTrxForGas / 1e6) {
-        console.log(`⛽ Envoi de TRX pour gas à ${fromAddress}...`);
-        await this.sendTRXForGas(fromAddress, config.sweep.minTrxForGas);
-        // Attendre la confirmation
-        await this._sleep(5000);
-      }
+      const destination = toAddress || config.tron.centralWallet.address;
 
-      // 2. Créer l'instance TronWeb avec la clé du wallet source
       const tronWebSrc = new TronWeb({
         fullHost: config.tron.fullHost,
         privateKey: fromPrivateKey,
         headers: config.tron.apiKey ? { 'TRON-PRO-API-KEY': config.tron.apiKey } : {},
       });
 
-      // 3. Appeler transfer sur le contrat USDT
       const contract = await tronWebSrc.contract().at(this.usdtContract);
       const amountSun = Math.floor(amount * 1e6);
 
       const tx = await contract.methods
-        .transfer(config.tron.centralWallet.address, amountSun)
+        .transfer(destination, amountSun)
         .send({ feeLimit: config.sweep.feeLimit });
 
-      console.log(`💸 Sweep de ${amount} USDT de ${fromAddress} → central (tx: ${tx})`);
+      console.log(`💸 Sweep de ${amount} USDT de ${fromAddress} → ${destination} (tx: ${tx})`);
       return tx;
     } catch (error) {
       console.error(`Erreur sweepUSDT depuis ${fromAddress}:`, error.message);
