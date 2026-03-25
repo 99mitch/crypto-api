@@ -114,6 +114,7 @@ export default function PaymentDetail() {
             <DetailRow label="Amount" value={formatUSDT(payment.amount)} />
             <DetailRow label="Received" value={payment.receivedAmount ? formatUSDT(payment.receivedAmount) : null} />
             <DetailRow label="Wallet Address" value={payment.walletAddress} />
+            <DetailRow label="Sender Address" value={payment.senderAddress} />
             <DetailRow label="TX Hash" value={payment.txHash} />
             <DetailRow label="Confirmations" value={payment.confirmations} />
             <DetailRow label="Sweep Status" value={payment.sweepStatus} />
