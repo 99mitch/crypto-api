@@ -1,0 +1,35 @@
+{
+  "name": "crypto-pay-api",
+  "version": "2.0.0",
+  "description": "API de paiement USDT TRC-20 avec wallet par transaction, auto-sweep, QR code, chiffrement AES-256 et dashboard admin",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:unit": "jest tests/unit --forceExit",
+    "test:integration": "jest tests/integration --forceExit --detectOpenHandles",
+    "test:coverage": "jest --coverage --forceExit --detectOpenHandles",
+    "generate-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
+    "dashboard:build": "cd dashboard && npm run build"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "helmet": "^7.1.0",
+    "mongoose": "^8.6.0",
+    "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
+    "qrcode": "^1.5.4",
+    "tronweb": "^6.0.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.0.0",
+    "nodemon": "^3.1.4",
+    "supertest": "^7.0.0"
+  }
+}
