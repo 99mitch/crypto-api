@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { DollarSign, TrendingUp, CreditCard, CheckCircle } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell
@@ -18,52 +18,59 @@ function useDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const [statsRes, activityRes] = await Promise.all([
-        api.get('/stats'),
-        api.get('/recent-activity?limit=10'),
-      ])
-      setStats(statsRes.data.stats)
-      setActivity(activityRes.data.activities)
-      setError(null)
-    } catch (err) {
-      if (err.response?.status !== 401) setError('Failed to load dashboard data')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const fetchChartData = useCallback(async () => {
-    const days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date()
-      d.setDate(d.getDate() - (6 - i))
-      return d
-    })
-
-    try {
-      const results = await Promise.all(
-        days.map(day => {
-          const { from, to } = getDayRange(day)
-          return api.get(`/payments?from=${from}&to=${to}&status=swept&limit=1000`)
-            .then(r => ({
-              day: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-              revenue: r.data.payments.reduce((sum, p) => sum + (p.receivedAmount || 0), 0),
-            }))
-        })
-      )
-      setChartData(results)
-    } catch {
-      // chart is non-critical
-    }
-  }, [])
-
   useEffect(() => {
+    const controller = new AbortController()
+    const { signal } = controller
+
+    const fetchStats = async () => {
+      try {
+        const [statsRes, activityRes] = await Promise.all([
+          api.get('/stats', { signal }),
+          api.get('/recent-activity?limit=10', { signal }),
+        ])
+        setStats(statsRes.data.stats)
+        setActivity(activityRes.data.activities)
+        setError(null)
+      } catch (err) {
+        if (err.code === 'ERR_CANCELED') return
+        if (err.response?.status !== 401) setError('Failed to load dashboard data')
+      } finally {
+        setLoading(prev => prev ? false : prev)
+      }
+    }
+
+    const fetchChartData = async () => {
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date()
+        d.setDate(d.getDate() - (6 - i))
+        return d
+      })
+      try {
+        const results = await Promise.all(
+          days.map(day => {
+            const { from, to } = getDayRange(day)
+            return api.get(`/payments?from=${from}&to=${to}&status=swept&limit=1000`, { signal })
+              .then(r => ({
+                day: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                revenue: r.data.payments.reduce((sum, p) => sum + (p.receivedAmount || 0), 0),
+              }))
+          })
+        )
+        setChartData(results)
+      } catch {
+        // chart is non-critical, includes ERR_CANCELED on unmount
+      }
+    }
+
     fetchStats()
     fetchChartData()
     const interval = setInterval(fetchStats, 15000)
-    return () => clearInterval(interval)
-  }, [fetchStats, fetchChartData])
+
+    return () => {
+      controller.abort()
+      clearInterval(interval)
+    }
+  }, [])
 
   return { stats, activity, chartData, loading, error }
 }
