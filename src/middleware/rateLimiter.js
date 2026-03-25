@@ -83,8 +83,8 @@ module.exports = {
     message: 'Trop de paiements créés, attendez 1 minute.',
   }),
 
-  // Rate limit admin : 120 req/min (dashboard polling)
-  adminLimiter: limiter.middleware({ windowMs: 60000, max: 120 }),
+  // Rate limit admin : 600 req/min (dashboard polling)
+  adminLimiter: limiter.middleware({ windowMs: 60000, max: 600 }),
 
   // Rate limit status polling : 30/min par IP
   statusPollLimiter: limiter.middleware({

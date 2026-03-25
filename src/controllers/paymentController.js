@@ -7,7 +7,7 @@ class PaymentController {
    */
   async create(req, res) {
     try {
-      const { amount, metadata, description } = req.body;
+      const { amount, metadata, description, externalRef } = req.body;
 
       if (!amount || amount <= 0) {
         return res.status(400).json({ error: 'Montant invalide. Doit être > 0.' });
@@ -20,6 +20,7 @@ class PaymentController {
       const payment = await paymentService.createPayment(amount, {
         metadata,
         description,
+        externalRef,
       }, req);
 
       return res.status(201).json({

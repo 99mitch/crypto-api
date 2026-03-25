@@ -5,7 +5,7 @@ const { adminAuth, adminLogin } = require('../middleware/adminAuth');
 const { adminLimiter } = require('../middleware/rateLimiter');
 
 // Login (pas besoin d'auth)
-router.post('/login', adminLimiter, adminLogin);
+router.post('/login', adminLogin);
 
 // ===== Toutes les routes suivantes requièrent l'authentification admin =====
 router.use(adminAuth);

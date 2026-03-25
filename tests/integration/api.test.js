@@ -20,6 +20,14 @@ jest.mock('../../src/services/qrCodeService', () => ({
   generatePaymentQR: jest.fn().mockResolvedValue('data:image/png;base64,mockQRdata'),
 }));
 
+// Bypass rate limiting in tests
+jest.mock('../../src/middleware/rateLimiter', () => ({
+  globalLimiter: (req, res, next) => next(),
+  paymentCreateLimiter: (req, res, next) => next(),
+  statusPollLimiter: (req, res, next) => next(),
+  adminLimiter: (req, res, next) => next(),
+}));
+
 // Mock config
 jest.mock('../../src/config', () => ({
   port: 3999,
@@ -102,6 +110,18 @@ describe('POST /api/payments', () => {
   it('rejette une requête sans montant', async () => {
     const res = await request.post('/api/payments').send({});
     expect(res.status).toBe(400);
+  });
+
+  it('retourne le même paiement sur retry avec externalRef identique', async () => {
+    const payload = { amount: 50, externalRef: 'recharge-USR123-1743200000' };
+
+    const res1 = await request.post('/api/payments').send(payload);
+    const res2 = await request.post('/api/payments').send(payload);
+
+    expect(res1.status).toBe(201);
+    expect(res2.status).toBe(201);
+    expect(res1.body.payment.paymentId).toEqual(res2.body.payment.paymentId);
+    expect(res1.body.payment.externalRef).toEqual('recharge-USR123-1743200000');
   });
 });
 

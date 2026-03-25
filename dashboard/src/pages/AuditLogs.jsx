@@ -4,9 +4,10 @@ import api from '../hooks/useApi'
 import StatusBadge from '../components/StatusBadge'
 import Pagination from '../components/Pagination'
 import { formatDateTime, getDayRange } from '../utils/formatters'
-import { ACTION_ENUM } from '../constants'
+import { ACTION_ENUM, LEVEL_COLORS } from '../constants'
 
-const LEVEL_OPTIONS = ['', 'info', 'warn', 'error', 'debug']
+const LEVEL_OPTIONS = Object.keys(LEVEL_COLORS)
+const FILTER_CLS = 'px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600'
 
 export default function AuditLogs() {
   const navigate = useNavigate()
@@ -19,6 +20,7 @@ export default function AuditLogs() {
   const [filters, setFilters] = useState({ action: '', level: '', from: '', to: '' })
 
   useEffect(() => {
+    const controller = new AbortController()
     setLoading(true)
     const params = new URLSearchParams({ page, limit: 50 })
     if (filters.action) params.set('action', filters.action)
@@ -26,15 +28,17 @@ export default function AuditLogs() {
     if (filters.from) params.set('from', getDayRange(new Date(filters.from)).from)
     if (filters.to) params.set('to', getDayRange(new Date(filters.to)).to)
 
-    api.get(`/audit-logs?${params}`)
+    api.get(`/audit-logs?${params}`, { signal: controller.signal })
       .then(r => {
         setLogs(r.data.logs)
         setTotal(r.data.total)
         setTotalPages(r.data.totalPages)
         setError(null)
       })
-      .catch(() => setError('Failed to load audit logs'))
+      .catch(err => { if (err.code !== 'ERR_CANCELED') setError('Failed to load audit logs') })
       .finally(() => setLoading(false))
+
+    return () => controller.abort()
   }, [page, filters])
 
   function handleFilterChange(field, value) {
@@ -51,7 +55,7 @@ export default function AuditLogs() {
         <select
           value={filters.action}
           onChange={e => handleFilterChange('action', e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600 max-w-xs"
+          className={`${FILTER_CLS} max-w-xs`}
         >
           <option value="">All actions</option>
           {ACTION_ENUM.map(a => (
@@ -61,10 +65,10 @@ export default function AuditLogs() {
         <select
           value={filters.level}
           onChange={e => handleFilterChange('level', e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600"
+          className={FILTER_CLS}
         >
           <option value="">All levels</option>
-          {LEVEL_OPTIONS.filter(Boolean).map(l => (
+          {LEVEL_OPTIONS.map(l => (
             <option key={l} value={l}>{l}</option>
           ))}
         </select>
@@ -72,13 +76,13 @@ export default function AuditLogs() {
           type="date"
           value={filters.from}
           onChange={e => handleFilterChange('from', e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600"
+          className={FILTER_CLS}
         />
         <input
           type="date"
           value={filters.to}
           onChange={e => handleFilterChange('to', e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 focus:outline-none focus:border-emerald-600"
+          className={FILTER_CLS}
         />
       </div>
 

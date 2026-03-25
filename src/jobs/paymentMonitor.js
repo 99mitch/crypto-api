@@ -133,6 +133,7 @@ class PaymentMonitor {
           payment.status = 'confirmed';
           payment.receivedAmount = balance;
           payment.txHash = matchingTx?.txHash || null;
+          payment.senderAddress = matchingTx?.from || null;
           payment.confirmations = 1;
           payment.sweepStatus = 'pending';
           await payment.save();

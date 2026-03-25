@@ -15,6 +15,7 @@ class WebhookService {
       amount: payment.amount,
       receivedAmount: payment.receivedAmount,
       txHash: payment.txHash,
+      senderAddress: payment.senderAddress,
       walletAddress: payment.wallet.address,
       metadata: payment.metadata,
       confirmedAt: new Date().toISOString(),

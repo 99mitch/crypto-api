@@ -1,4 +1,4 @@
-const TronWeb = require('tronweb');
+const { TronWeb } = require('tronweb');
 const config = require('../config');
 
 class TronService {
@@ -68,7 +68,6 @@ class TronService {
       const url = `${config.tron.fullHost}/v1/accounts/${address}/transactions/trc20`;
       const params = {
         only_to: true,
-        only_confirmed: true,
         limit: 50,
         contract_address: this.usdtContract,
       };
@@ -86,14 +85,21 @@ class TronService {
 
       return response.data
         .filter((tx) => tx.to === address && tx.token_info?.address === this.usdtContract)
-        .map((tx) => ({
-          txHash: tx.transaction_id,
-          from: tx.from,
-          to: tx.to,
-          amount: Number(tx.value) / 1e6,
-          timestamp: tx.block_timestamp,
-          confirmed: true,
-        }));
+        .map((tx) => {
+          // tx.from peut être en hex (41...) ou base58 (T...) selon la version TronGrid
+          let from = tx.from;
+          if (from && from.startsWith('41')) {
+            try { from = TronWeb.address.fromHex(from); } catch (_) {}
+          }
+          return {
+            txHash: tx.transaction_id,
+            from,
+            to: tx.to,
+            amount: Number(tx.value) / 1e6,
+            timestamp: tx.block_timestamp,
+            confirmed: tx.confirmed ?? true,
+          };
+        });
     } catch (error) {
       console.error(`Erreur getIncomingUSDTTransactions pour ${address}:`, error.message);
       return [];

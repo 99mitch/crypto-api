@@ -37,6 +37,7 @@ const paymentSchema = new mongoose.Schema(
 
     // Infos blockchain
     txHash: { type: String, default: null },
+    senderAddress: { type: String, default: null },
     confirmations: { type: Number, default: 0 },
     receivedAmount: { type: Number, default: 0 },
 
@@ -64,6 +65,9 @@ const paymentSchema = new mongoose.Schema(
 
     // Description / référence
     description: { type: String, default: '' },
+
+    // Référence externe (idempotence) — ex: "recharge-USR123-1743200000"
+    externalRef: { type: String, default: null, index: true, sparse: true },
   },
   {
     timestamps: true, // createdAt, updatedAt
@@ -88,11 +92,13 @@ paymentSchema.methods.toPublicJSON = function () {
     walletAddress: this.wallet.address,
     qrCode: this.qrCode,
     txHash: this.txHash,
+    senderAddress: this.senderAddress,
     receivedAmount: this.receivedAmount,
     sweepStatus: this.sweepStatus,
     expiresAt: this.expiresAt,
     metadata: this.metadata,
     description: this.description,
+    externalRef: this.externalRef,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
   };

@@ -15,6 +15,12 @@ class PaymentService {
    * @returns {object} Payment public JSON
    */
   async createPayment(amount, options = {}, req = null) {
+    // Idempotence : retourner le paiement existant si externalRef déjà utilisée
+    if (options.externalRef) {
+      const existing = await Payment.findOne({ externalRef: options.externalRef });
+      if (existing) return existing.toPublicJSON();
+    }
+
     // Générer un wallet dédié
     const wallet = await tronService.generateWallet();
 
@@ -44,6 +50,7 @@ class PaymentService {
       expiresAt,
       metadata: options.metadata || {},
       description: options.description || '',
+      externalRef: options.externalRef || null,
     });
 
     // Audit log

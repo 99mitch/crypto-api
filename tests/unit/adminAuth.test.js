@@ -72,8 +72,7 @@ describe('Admin Auth', () => {
     });
 
     it('rejette un token expiré', () => {
-      const token = generateAdminToken({}, 0); // expire immédiatement
-      // Attendre 1ms pour que le token soit expiré
+      const token = generateAdminToken({}, -1); // exp dans le passé
       expect(() => verifyAdminToken(token)).toThrow('Token expiré');
     });
 
