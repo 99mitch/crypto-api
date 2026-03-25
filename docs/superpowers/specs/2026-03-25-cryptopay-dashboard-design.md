@@ -107,6 +107,7 @@ server: {
 - Single input: "Admin Key" (type=password)
 - On submit: store key in localStorage, navigate to `/dashboard`
 - No API call — key validity is confirmed on first protected request
+- If the key is wrong, the Axios 401 interceptor clears it and redirects back to `/login?error=1`. The Login page checks for `?error=1` in the URL and shows an inline error: "Invalid admin key. Please try again."
 
 ### Dashboard
 **4 StatCards (top row):**
@@ -116,12 +117,12 @@ server: {
 4. Success Rate — `swept / totalPayments * 100`%
 
 **Charts (two-column):**
-- Left: Bar chart — Revenue last 7 days. Computed via `Promise.all` of 7 calls to `GET /payments?from=<day_start>&to=<day_end>&limit=1000`, aggregating received USDT per day client-side.
+- Left: Bar chart — Revenue last 7 days. Computed via `Promise.all` of 7 calls to `GET /payments?from=<day_start>&to=<day_end>&status=swept&limit=1000`, aggregating `receivedAmount` per day client-side. Only `swept` payments are counted to match the logic used by `stats.totalRevenue`.
 - Right: Horizontal bar chart — payments by status from `stats.byStatus`
 
 **Recent Activity feed (bottom):**
-- `GET /recent-activity?limit=10`
-- List of entries: Payment ID, amount, status badge, relative time
+- `GET /recent-activity?limit=10` — response key is `activities`, each item: `{ paymentId, amount, status, receivedAmount, createdAt, updatedAt }`
+- List of entries: Payment ID, amount, status badge, relative time (based on `updatedAt`)
 - Auto-refresh every 15s via `setInterval` (applies to stats + activity)
 - Live indicator: small animated green dot labeled "Live"
 
@@ -135,15 +136,28 @@ server: {
 ### Payment Detail
 - Back button + Payment ID in header
 - Two-column layout:
-  - Left: all payment fields (amount, wallet address, tx hash, confirmations, sweep info, expiry, webhook attempts, metadata, description)
-  - Right: QR code displayed as `<img src={payment.qrCode} />`
+  - Left: all payment fields (amount, wallet address, tx hash, confirmations, sweep status, sweep tx hash, expiry, webhook attempts, metadata, description). Note: `sweepRetryCount` is not exposed by `toAdminJSON()` — omit from UI.
+  - Right: QR code displayed as `<img src={payment.qrCode} />`. The `qrCode` field is a base64 data URI (e.g. `data:image/png;base64,...`), usable directly as `src`.
 - Retry Sweep button: shown only if `payment.sweepStatus === 'failed'`. Calls `POST /payments/:id/retry-sweep`. Shows `window.confirm` before calling. Toast feedback on success/error.
-- Bottom: `AuditTimeline` component — vertical timeline, one entry per history item. Each entry shows: icon by action category, action name, level badge, timestamp, collapsible details JSON.
+- Bottom: `AuditTimeline` — data from `GET /payments/:id/history`. Response shape: array of `{ _id, action, level, details, ip, createdAt }`. Vertical timeline, one entry per item (sorted ascending by `createdAt`). Each entry shows: Lucide React icon by action category (see table below), action name, level badge, timestamp, collapsible details JSON.
+
+**Action category → Lucide icon mapping:**
+
+| Category | Actions | Icon |
+|----------|---------|------|
+| Payment lifecycle | `payment_created`, `payment_expired`, `payment_confirmed`, `payment_cancelled`, `payment_partial_received` | `CreditCard` |
+| Sweep | `sweep_*` | `ArrowRightLeft` |
+| Webhook | `webhook_*` | `Webhook` |
+| Admin | `admin_*` | `ShieldCheck` |
+| System | `monitor_*`, `api_error`, `rate_limit_hit` | `Settings` |
 
 ### Audit Logs
-- Table columns: Timestamp, Action, Level (colored badge), Payment ID (link to detail if present), IP
-- Filters: action select (full enum list), level select, date range
+- Table columns: Timestamp, Action, Level (colored badge), Payment ID (link to `/payments/:id` if present), IP
+- Filters: action select (see full enum below), level select (`info`, `warn`, `error`, `debug`), date range
 - Pagination: 50 per page
+
+**Action enum values** (from `AuditLog.js`):
+`payment_created`, `payment_expired`, `payment_confirmed`, `payment_cancelled`, `payment_partial_received`, `sweep_initiated`, `sweep_gas_sent`, `sweep_completed`, `sweep_failed`, `sweep_retry_success`, `sweep_retry_failed`, `sweep_retries_exhausted`, `sweep_manual_retry`, `webhook_sent`, `webhook_failed`, `webhook_retry_success`, `webhook_retry_failed`, `webhook_retries_exhausted`, `admin_login`, `admin_login_failed`, `admin_cancel_payment`, `admin_retry_sweep`, `admin_view_payment`, `monitor_cycle_start`, `monitor_cycle_end`, `monitor_error`, `api_error`, `rate_limit_hit`
 
 ---
 
