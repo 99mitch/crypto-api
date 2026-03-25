@@ -6,7 +6,7 @@ import {
 import api from '../hooks/useApi'
 import StatCard from '../components/StatCard'
 import StatusBadge from '../components/StatusBadge'
-import { formatUSDT, formatRelativeTime, getDayRange } from '../utils/formatters'
+import { formatUSDT, formatRelativeTime } from '../utils/formatters'
 import { STATUS_COLORS } from '../constants'
 
 const STATUS_ORDER = ['swept', 'confirmed', 'confirming', 'pending', 'expired', 'failed']
@@ -40,26 +40,14 @@ function useDashboard() {
     }
 
     const fetchChartData = async () => {
-      const days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date()
-        d.setUTCHours(0, 0, 0, 0)
-        d.setUTCDate(d.getUTCDate() - (6 - i))
-        return d
-      })
       try {
-        const results = await Promise.all(
-          days.map(day => {
-            const { from, to } = getDayRange(day)
-            return api.get(`/payments?from=${from}&to=${to}&status=swept&limit=1000`, { signal })
-              .then(r => ({
-                day: day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-                revenue: r.data.payments.reduce((sum, p) => sum + (p.receivedAmount || 0), 0),
-              }))
-          })
-        )
-        setChartData(results)
+        const res = await api.get('/stats/daily?days=7', { signal })
+        setChartData(res.data.days.map(({ date, revenue }) => ({
+          day: new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+          revenue,
+        })))
       } catch {
-        // chart is non-critical, includes ERR_CANCELED on unmount
+        // chart is non-critical
       }
     }
 

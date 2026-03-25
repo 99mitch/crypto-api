@@ -150,31 +150,31 @@ class AdminController {
       const days = Math.min(parseInt(req.query.days) || 7, 90);
       const status = req.query.status || 'swept';
 
-      const now = new Date();
-      const results = [];
+      const since = new Date();
+      since.setUTCHours(0, 0, 0, 0);
+      since.setUTCDate(since.getUTCDate() - (days - 1));
 
-      for (let i = days - 1; i >= 0; i--) {
-        const from = new Date(now);
-        from.setDate(from.getDate() - i);
-        from.setHours(0, 0, 0, 0);
+      const rows = await Payment.aggregate([
+        { $match: { status, createdAt: { $gte: since } } },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' },
+            },
+            revenue: { $sum: '$receivedAmount' },
+            count:   { $sum: 1 },
+          },
+        },
+      ]);
 
-        const to = new Date(from);
-        to.setHours(23, 59, 59, 999);
+      const byDate = Object.fromEntries(rows.map(r => [r._id, r]));
 
-        const [count, revenue] = await Promise.all([
-          Payment.countDocuments({ status, createdAt: { $gte: from, $lte: to } }),
-          Payment.aggregate([
-            { $match: { status, createdAt: { $gte: from, $lte: to } } },
-            { $group: { _id: null, total: { $sum: '$receivedAmount' } } },
-          ]),
-        ]);
-
-        results.push({
-          date: from.toISOString().split('T')[0],
-          count,
-          revenue: revenue[0]?.total || 0,
-        });
-      }
+      const results = Array.from({ length: days }, (_, i) => {
+        const d = new Date(since);
+        d.setUTCDate(since.getUTCDate() + i);
+        const date = d.toISOString().split('T')[0];
+        return { date, revenue: byDate[date]?.revenue || 0, count: byDate[date]?.count || 0 };
+      });
 
       return res.json({ success: true, days: results });
     } catch (error) {
