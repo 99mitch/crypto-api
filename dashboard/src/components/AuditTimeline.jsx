@@ -10,13 +10,13 @@ export default function AuditTimeline({ history }) {
   const [expanded, setExpanded] = useState({})
 
   if (!history?.length) {
-    return <p className="text-gray-500 text-sm">No history available.</p>
+    return <p className="text-zinc-500 text-sm">No history available.</p>
   }
 
   return (
     <div className="relative">
       {/* Vertical line */}
-      <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-800" />
+      <div className="absolute left-4 top-0 bottom-0 w-px bg-zinc-800" />
 
       <ul className="space-y-4">
         {history.map((entry, i) => {
@@ -28,34 +28,34 @@ export default function AuditTimeline({ history }) {
           return (
             <li key={entry._id ?? i} className="relative flex gap-4 pl-10">
               {/* Icon bubble */}
-              <div className="absolute left-0 flex items-center justify-center w-8 h-8 rounded-full bg-gray-800 border border-gray-700 shrink-0">
-                <Icon size={14} className="text-gray-400" />
+              <div className="absolute left-0 flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 shrink-0">
+                <Icon size={14} className="text-zinc-400" />
               </div>
 
-              <div className="flex-1 bg-gray-900 rounded-lg p-3 border border-gray-800">
+              <div className="flex-1 bg-zinc-900 rounded-lg p-3 border border-zinc-800">
                 <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <span className="text-sm font-medium text-gray-200">{entry.action}</span>
+                  <span className="text-sm font-medium text-zinc-200">{entry.action}</span>
                   <div className="flex items-center gap-2">
                     <StatusBadge level={entry.level} />
-                    <span className="text-xs text-gray-500">{formatDateTime(entry.createdAt)}</span>
+                    <span className="text-xs text-zinc-500">{formatDateTime(entry.createdAt)}</span>
                   </div>
                 </div>
 
                 {entry.ip && (
-                  <p className="text-xs text-gray-500 mt-1">IP: {entry.ip}</p>
+                  <p className="text-xs text-zinc-500 mt-1">IP: {entry.ip}</p>
                 )}
 
                 {hasDetails && (
                   <button
                     onClick={() => setExpanded(e => ({ ...e, [entry._id ?? i]: !isExpanded }))}
-                    className="text-xs text-emerald-400 hover:text-emerald-300 mt-2 transition-colors"
+                    className="text-xs text-zinc-300 hover:text-zinc-100 mt-2 transition-colors"
                   >
                     {isExpanded ? 'Hide details' : 'Show details'}
                   </button>
                 )}
 
                 {isExpanded && (
-                  <pre className="mt-2 text-xs bg-gray-950 rounded p-2 text-gray-300 overflow-x-auto">
+                  <pre className="mt-2 text-xs bg-zinc-950 rounded p-2 text-zinc-300 overflow-x-auto">
                     {JSON.stringify(entry.details, null, 2)}
                   </pre>
                 )}
