@@ -17,7 +17,7 @@ function ProtectedRoute() {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
   return (
-    <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-zinc-950 text-zinc-100 overflow-hidden">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -28,10 +28,10 @@ function ProtectedRoute() {
       )}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-gray-900 border-b border-gray-800">
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-zinc-900 border-b border-zinc-800">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-1.5 text-gray-400 hover:text-gray-100 rounded-lg"
+            className="p-1.5 text-zinc-400 hover:text-zinc-100 rounded-lg"
           >
             <Menu size={20} />
           </button>
