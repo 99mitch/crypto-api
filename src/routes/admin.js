@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const paymentController = require('../controllers/paymentController');
 const { adminAuth, adminLogin } = require('../middleware/adminAuth');
 const { adminLimiter } = require('../middleware/rateLimiter');
 
@@ -13,6 +14,9 @@ router.use(adminLimiter);
 
 // Stats globales
 router.get('/stats', adminController.getStats);
+
+// Créer un paiement (depuis le dashboard admin)
+router.post('/payments', paymentController.create);
 
 // Liste des paiements
 router.get('/payments', adminController.listPayments);

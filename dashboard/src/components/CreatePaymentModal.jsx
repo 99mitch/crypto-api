@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import api from '../hooks/useApi'
 import { X } from 'lucide-react'
 
 export default function CreatePaymentModal({ onClose }) {
@@ -32,7 +32,7 @@ export default function CreatePaymentModal({ onClose }) {
     setSubmitting(true)
     setError(null)
     try {
-      const res = await axios.post('/api/payments', payload)
+      const res = await api.post('/payments', payload)
       navigate('/payments/' + res.data.payment.paymentId)
     } catch (err) {
       setError(err.response?.data?.error ?? 'Failed to create payment')
