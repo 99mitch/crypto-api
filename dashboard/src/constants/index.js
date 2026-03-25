@@ -23,7 +23,7 @@ export const ACTION_ENUM = [
   'webhook_sent', 'webhook_failed', 'webhook_retry_success',
   'webhook_retry_failed', 'webhook_retries_exhausted',
   'admin_login', 'admin_login_failed', 'admin_cancel_payment',
-  'admin_retry_sweep', 'admin_view_payment',
+  'admin_retry_sweep',
   'monitor_cycle_start', 'monitor_cycle_end', 'monitor_error',
   'api_error', 'rate_limit_hit',
 ]
