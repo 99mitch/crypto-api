@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import api from '../hooks/useApi'
 import StatusBadge from '../components/StatusBadge'
 import Pagination from '../components/Pagination'
-import { formatUSDT, formatDateTime } from '../utils/formatters'
+import { formatUSDT, formatDateTime, getDayRange } from '../utils/formatters'
 
 const STATUS_OPTIONS = ['', 'pending', 'confirming', 'confirmed', 'expired', 'swept', 'failed']
 
@@ -21,9 +21,8 @@ export default function Payments() {
     setLoading(true)
     const params = new URLSearchParams({ page, limit: 20 })
     if (filters.status) params.set('status', filters.status)
-    // Convert YYYY-MM-DD (date input) to ISO strings the API expects
-    if (filters.from) params.set('from', new Date(filters.from + 'T00:00:00').toISOString())
-    if (filters.to) params.set('to', new Date(filters.to + 'T23:59:59').toISOString())
+    if (filters.from) params.set('from', getDayRange(new Date(filters.from)).from)
+    if (filters.to) params.set('to', getDayRange(new Date(filters.to)).to)
 
     api.get(`/payments?${params}`)
       .then(r => {
