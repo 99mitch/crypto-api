@@ -84,7 +84,6 @@ class TronService {
       if (!response || !response.data) return [];
 
       return response.data
-        .filter((tx) => tx.token_info?.address === this.usdtContract)
         .map((tx) => {
           // tx.from et tx.to peuvent être en hex (41...) ou base58 (T...) selon la version TronGrid
           let from = tx.from;
