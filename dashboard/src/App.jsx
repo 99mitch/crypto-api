@@ -35,7 +35,7 @@ function ProtectedRoute() {
           >
             <Menu size={20} />
           </button>
-          <span className="text-sm font-semibold text-gray-100">CryptoPay</span>
+          <span className="text-sm font-semibold text-zinc-100">CryptoPay</span>
         </div>
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
