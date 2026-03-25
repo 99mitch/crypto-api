@@ -9,7 +9,7 @@ import StatusBadge from '../components/StatusBadge'
 import { formatUSDT, formatRelativeTime } from '../utils/formatters'
 import { STATUS_COLORS } from '../constants'
 
-const STATUS_ORDER = ['swept', 'confirmed', 'confirming', 'pending', 'expired', 'failed']
+const STATUS_ORDER = ['swept', 'confirmed', 'confirming', 'pending', 'expired', 'cancelled', 'failed']
 
 function useDashboard() {
   const [stats, setStats] = useState(null)

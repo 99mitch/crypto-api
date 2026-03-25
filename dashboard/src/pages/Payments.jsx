@@ -7,7 +7,7 @@ import Pagination from '../components/Pagination'
 import { formatUSDT, formatDateTime, getDayRange } from '../utils/formatters'
 import CreatePaymentModal from '../components/CreatePaymentModal'
 
-const STATUS_OPTIONS = ['', 'pending', 'confirming', 'confirmed', 'expired', 'swept', 'failed']
+const STATUS_OPTIONS = ['', 'pending', 'confirming', 'confirmed', 'expired', 'cancelled', 'swept', 'failed']
 
 export default function Payments() {
   const navigate = useNavigate()

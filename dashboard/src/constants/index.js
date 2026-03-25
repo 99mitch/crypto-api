@@ -4,6 +4,7 @@ export const STATUS_COLORS = {
   confirming: { bg: 'bg-zinc-800 border border-zinc-700',   text: 'text-zinc-300', dot: 'bg-zinc-400', bar: 'bg-zinc-400' },
   pending:    { bg: 'bg-zinc-900 border border-zinc-700',   text: 'text-zinc-400', dot: 'bg-zinc-500', bar: 'bg-zinc-500' },
   expired:    { bg: 'bg-zinc-900 border border-zinc-800',   text: 'text-zinc-500', dot: 'bg-zinc-600', bar: 'bg-zinc-600' },
+  cancelled:  { bg: 'bg-zinc-900 border border-zinc-800',   text: 'text-zinc-500', dot: 'bg-zinc-600', bar: 'bg-zinc-600' },
   failed:     { bg: 'bg-rose-950 border border-rose-900',   text: 'text-rose-400', dot: 'bg-rose-500', bar: 'bg-rose-500' },
 }
 
