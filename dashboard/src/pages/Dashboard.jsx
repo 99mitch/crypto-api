@@ -83,7 +83,7 @@ export default function Dashboard() {
       <div className="space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-gray-900 rounded-xl p-5 border border-gray-800 h-28 animate-pulse" />
+            <div key={i} className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 h-28 animate-pulse" />
           ))}
         </div>
       </div>
@@ -106,9 +106,9 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-100">Dashboard</h1>
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <h1 className="text-xl font-semibold text-zinc-100">Dashboard</h1>
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <span className="w-2 h-2 rounded-full bg-zinc-100 animate-pulse" />
           Live
         </div>
       </div>
@@ -143,25 +143,25 @@ export default function Dashboard() {
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* 7-day revenue */}
-        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
-          <h2 className="text-sm font-medium text-gray-300 mb-4">Revenue — Last 7 Days</h2>
+        <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
+          <h2 className="text-sm font-medium text-zinc-300 mb-4">Revenue — Last 7 Days</h2>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <XAxis dataKey="day" tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#9ca3af', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="day" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip
-                contentStyle={{ background: '#111827', border: '1px solid #1f2937', borderRadius: 8 }}
-                labelStyle={{ color: '#e5e7eb' }}
+                contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 8 }}
+                labelStyle={{ color: '#f4f4f5' }}
                 formatter={v => [`${v.toFixed(2)} USDT`, 'Revenue']}
               />
-              <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="revenue" fill="#d4d4d8" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         {/* Status distribution */}
-        <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
-          <h2 className="text-sm font-medium text-gray-300 mb-4">Payments by Status</h2>
+        <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
+          <h2 className="text-sm font-medium text-zinc-300 mb-4">Payments by Status</h2>
           <div className="space-y-3">
             {statusChartData.map(({ name, count }) => {
               const pct = stats?.totalPayments ? (count / stats.totalPayments * 100).toFixed(0) : 0
@@ -169,10 +169,10 @@ export default function Dashboard() {
               return (
                 <div key={name}>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-gray-400 capitalize">{name}</span>
-                    <span className="text-gray-300">{count}</span>
+                    <span className="text-zinc-400 capitalize">{name}</span>
+                    <span className="text-zinc-300">{count}</span>
                   </div>
-                  <div className="w-full bg-gray-800 rounded-full h-2">
+                  <div className="w-full bg-zinc-800 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${colors.dot}`}
                       style={{ width: `${pct}%` }}
@@ -186,21 +186,21 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div className="bg-gray-900 rounded-xl p-5 border border-gray-800">
-        <h2 className="text-sm font-medium text-gray-300 mb-4">Recent Activity</h2>
+      <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
+        <h2 className="text-sm font-medium text-zinc-300 mb-4">Recent Activity</h2>
         {activity.length === 0 ? (
-          <p className="text-gray-500 text-sm">No activity yet.</p>
+          <p className="text-zinc-500 text-sm">No activity yet.</p>
         ) : (
-          <ul className="divide-y divide-gray-800">
+          <ul className="divide-y divide-zinc-800">
             {activity.map(item => (
               <li key={item.paymentId} className="py-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <StatusBadge status={item.status} />
-                  <span className="text-sm text-gray-300 font-mono truncate">{item.paymentId}</span>
+                  <span className="text-sm text-zinc-300 font-mono truncate">{item.paymentId}</span>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
-                  <span className="text-sm text-gray-400">{formatUSDT(item.amount)}</span>
-                  <span className="text-xs text-gray-500">{formatRelativeTime(item.updatedAt)}</span>
+                  <span className="text-sm text-zinc-400">{formatUSDT(item.amount)}</span>
+                  <span className="text-xs text-zinc-500">{formatRelativeTime(item.updatedAt)}</span>
                 </div>
               </li>
             ))}
