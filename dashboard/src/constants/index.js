@@ -1,17 +1,17 @@
 export const STATUS_COLORS = {
-  pending:    { bg: 'bg-gray-700',   text: 'text-gray-300',   dot: 'bg-gray-400'   },
-  confirming: { bg: 'bg-yellow-900', text: 'text-yellow-300', dot: 'bg-yellow-400' },
-  confirmed:  { bg: 'bg-blue-900',   text: 'text-blue-300',   dot: 'bg-blue-400'   },
-  expired:    { bg: 'bg-red-900',    text: 'text-red-300',    dot: 'bg-red-400'    },
-  swept:      { bg: 'bg-emerald-900',text: 'text-emerald-300',dot: 'bg-emerald-400'},
-  failed:     { bg: 'bg-rose-900',   text: 'text-rose-300',   dot: 'bg-rose-400'   },
+  swept:      { bg: 'bg-zinc-100',                          text: 'text-zinc-900', dot: 'bg-zinc-900' },
+  confirmed:  { bg: 'bg-zinc-800 border border-zinc-700',   text: 'text-zinc-200', dot: 'bg-zinc-200' },
+  confirming: { bg: 'bg-zinc-800 border border-zinc-700',   text: 'text-zinc-300', dot: 'bg-zinc-400' },
+  pending:    { bg: 'bg-zinc-900 border border-zinc-700',   text: 'text-zinc-400', dot: 'bg-zinc-500' },
+  expired:    { bg: 'bg-zinc-900 border border-zinc-800',   text: 'text-zinc-500', dot: 'bg-zinc-600' },
+  failed:     { bg: 'bg-rose-950 border border-rose-900',   text: 'text-rose-400', dot: 'bg-rose-500' },
 }
 
 export const LEVEL_COLORS = {
-  info:  { bg: 'bg-blue-900',  text: 'text-blue-300'  },
-  warn:  { bg: 'bg-yellow-900',text: 'text-yellow-300'},
-  error: { bg: 'bg-red-900',   text: 'text-red-300'   },
-  debug: { bg: 'bg-gray-700',  text: 'text-gray-300'  },
+  error: { bg: 'bg-rose-950 border border-rose-900', text: 'text-rose-400' },
+  warn:  { bg: 'bg-zinc-800 border border-zinc-700', text: 'text-zinc-300' },
+  info:  { bg: 'bg-zinc-900 border border-zinc-800', text: 'text-zinc-400' },
+  debug: { bg: 'bg-zinc-900 border border-zinc-800', text: 'text-zinc-600' },
 }
 
 export const ACTION_ENUM = [
