@@ -63,7 +63,6 @@ class RetryService {
         await AuditLog.log({
           paymentId: payment.paymentId,
           action: 'webhook_retry_success',
-          details: { attempt: attempt + 1 },
         });
       } catch (error) {
         console.error(
@@ -126,7 +125,7 @@ class RetryService {
         await AuditLog.log({
           paymentId: payment.paymentId,
           action: 'sweep_retry_success',
-          details: { attempt: attempt + 1, txHash },
+          details: { txHash },
         });
 
         console.log(`✅ Sweep retry réussi pour ${payment.paymentId} → tx: ${txHash}`);
@@ -143,7 +142,8 @@ class RetryService {
         await AuditLog.log({
           paymentId: payment.paymentId,
           action: 'sweep_retry_failed',
-          details: { attempt: attempt + 1, error: error.message },
+          level: 'error',
+          details: { error: error.message },
         });
 
         // Re-planifier

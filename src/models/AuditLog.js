@@ -124,6 +124,17 @@ auditLogSchema.statics.log = async function (params) {
   }
 };
 
+auditLogSchema.statics.logMany = async function (entries) {
+  if (!entries.length) return;
+  try {
+    await this.insertMany(entries.map(({ paymentId, action, level = 'info', details = {} }) => ({
+      paymentId, action, level, details,
+    })));
+  } catch (error) {
+    console.error('⚠️ Erreur écriture AuditLog batch:', error.message);
+  }
+};
+
 /**
  * Récupère l'historique d'un paiement
  */

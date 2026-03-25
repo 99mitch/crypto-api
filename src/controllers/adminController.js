@@ -32,18 +32,15 @@ class AdminController {
    */
   async getPayment(req, res) {
     try {
-      const payment = await paymentService.getPaymentAdmin(req.params.paymentId);
+      const [payment, history] = await Promise.all([
+        paymentService.getPaymentAdmin(req.params.paymentId),
+        AuditLog.getPaymentHistory(req.params.paymentId),
+      ]);
       if (!payment) {
         return res.status(404).json({ error: 'Paiement non trouvé' });
       }
 
-      await AuditLog.log({
-        paymentId: req.params.paymentId,
-        action: 'admin_view_payment',
-        req,
-      });
-
-      return res.json({ success: true, payment });
+      return res.json({ success: true, payment, history });
     } catch (error) {
       return res.status(500).json({ error: 'Erreur interne' });
     }
@@ -100,7 +97,6 @@ class AdminController {
       await AuditLog.log({
         paymentId: payment.paymentId,
         action: 'admin_retry_sweep',
-        details: { triggeredBy: 'admin' },
         req,
       });
 
@@ -140,6 +136,49 @@ class AdminController {
         })),
       });
     } catch (error) {
+      return res.status(500).json({ error: 'Erreur interne' });
+    }
+  }
+
+  /**
+   * GET /api/admin/stats/daily
+   * Breakdown journalier sur N jours (défaut: 7)
+   * Remplace les N requêtes parallèles du dashboard par une seule
+   */
+  async getDailyStats(req, res) {
+    try {
+      const days = Math.min(parseInt(req.query.days) || 7, 90);
+      const status = req.query.status || 'swept';
+
+      const now = new Date();
+      const results = [];
+
+      for (let i = days - 1; i >= 0; i--) {
+        const from = new Date(now);
+        from.setDate(from.getDate() - i);
+        from.setHours(0, 0, 0, 0);
+
+        const to = new Date(from);
+        to.setHours(23, 59, 59, 999);
+
+        const [count, revenue] = await Promise.all([
+          Payment.countDocuments({ status, createdAt: { $gte: from, $lte: to } }),
+          Payment.aggregate([
+            { $match: { status, createdAt: { $gte: from, $lte: to } } },
+            { $group: { _id: null, total: { $sum: '$receivedAmount' } } },
+          ]),
+        ]);
+
+        results.push({
+          date: from.toISOString().split('T')[0],
+          count,
+          revenue: revenue[0]?.total || 0,
+        });
+      }
+
+      return res.json({ success: true, days: results });
+    } catch (error) {
+      console.error('Erreur getDailyStats:', error);
       return res.status(500).json({ error: 'Erreur interne' });
     }
   }

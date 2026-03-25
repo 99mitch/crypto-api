@@ -89,14 +89,9 @@ class PaymentMonitor {
         { status: 'expired' }
       );
 
-      // Log chaque expiration
-      for (const payment of expiredPayments) {
-        await AuditLog.log({
-          paymentId: payment.paymentId,
-          action: 'payment_expired',
-          details: { amount: payment.amount, wallet: payment.wallet.address },
-        });
-      }
+      await AuditLog.logMany(
+        expiredPayments.map((p) => ({ paymentId: p.paymentId, action: 'payment_expired' }))
+      );
 
       console.log(`⏰ ${expiredPayments.length} paiement(s) expiré(s)`);
     }
@@ -116,10 +111,12 @@ class PaymentMonitor {
         // Vérifier le solde USDT sur le wallet dédié
         const balance = await tronService.getUSDTBalance(payment.wallet.address);
 
-        if (balance >= payment.amount) {
+        const minAccepted = payment.amount * (1 - config.payment.amountTolerance);
+        if (balance >= minAccepted) {
           // Paiement reçu !
+          const isPartial = balance < payment.amount;
           console.log(
-            `✅ Paiement reçu: ${payment.paymentId} - ${balance} USDT sur ${payment.wallet.address}`
+            `✅ Paiement reçu: ${payment.paymentId} - ${balance}/${payment.amount} USDT${isPartial ? ' (tolérance appliquée)' : ''}`
           );
 
           // Récupérer le hash de la transaction
@@ -141,11 +138,7 @@ class PaymentMonitor {
           await AuditLog.log({
             paymentId: payment.paymentId,
             action: 'payment_confirmed',
-            details: {
-              receivedAmount: balance,
-              txHash: matchingTx?.txHash,
-              from: matchingTx?.from,
-            },
+            details: matchingTx?.txHash ? { txHash: matchingTx.txHash } : {},
           });
 
           // Envoyer le webhook avec retry intelligent
@@ -157,7 +150,7 @@ class PaymentMonitor {
               webhookService.sendConfirmation(p)
             );
           }
-        } else if (balance > 0 && balance < payment.amount) {
+        } else if (balance > 0 && balance < minAccepted) {
           // Montant partiel reçu
           console.log(
             `⚠️ Montant partiel: ${payment.paymentId} - ${balance}/${payment.amount} USDT`
@@ -169,7 +162,6 @@ class PaymentMonitor {
             paymentId: payment.paymentId,
             action: 'payment_partial_received',
             level: 'warn',
-            details: { received: balance, expected: payment.amount },
           });
         }
       } catch (error) {
@@ -205,19 +197,54 @@ class PaymentMonitor {
         await AuditLog.log({
           paymentId: payment.paymentId,
           action: 'sweep_initiated',
-          details: { amount: payment.receivedAmount },
         });
 
         // Déchiffrer la clé privée
         const privateKey = this._decryptPrivateKey(payment.wallet.privateKey);
 
-        const sweepTxHash = await tronService.sweepUSDT(
-          privateKey,
-          payment.wallet.address,
-          payment.receivedAmount
-        );
+        const hasFees = config.fees.walletAddress && config.fees.percentage > 0;
+        const nbTransfers = hasFees ? 2 : 1;
+
+        // Envoyer le TRX pour gas (une seule fois, pour couvrir tous les transferts)
+        await tronService.ensureGasForSweep(payment.wallet.address, nbTransfers);
+
+        let feesAmount = null;
+        let feesTxHash = null;
+
+        if (hasFees) {
+          // Arrondi à 6 décimales (précision USDT TRC-20)
+          feesAmount = Math.floor(payment.receivedAmount * config.fees.percentage * 1e6) / 1e6;
+          const netAmount = Math.floor((payment.receivedAmount - feesAmount) * 1e6) / 1e6;
+
+          console.log(`💰 Frais: ${feesAmount} USDT (${config.fees.percentage * 100}%) → fees wallet`);
+
+          feesTxHash = await tronService.sweepUSDT(
+            privateKey,
+            payment.wallet.address,
+            feesAmount,
+            config.fees.walletAddress
+          );
+
+          await this._sleep(3000);
+
+          var sweepTxHash = await tronService.sweepUSDT(
+            privateKey,
+            payment.wallet.address,
+            netAmount,
+            config.tron.centralWallet.address
+          );
+        } else {
+          var sweepTxHash = await tronService.sweepUSDT(
+            privateKey,
+            payment.wallet.address,
+            payment.receivedAmount,
+            config.tron.centralWallet.address
+          );
+        }
 
         payment.sweepTxHash = sweepTxHash;
+        payment.feesAmount = feesAmount;
+        payment.feesTxHash = feesTxHash;
         payment.sweepStatus = 'completed';
         payment.status = 'swept';
         await payment.save();
@@ -225,7 +252,7 @@ class PaymentMonitor {
         await AuditLog.log({
           paymentId: payment.paymentId,
           action: 'sweep_completed',
-          details: { txHash: sweepTxHash, amount: payment.receivedAmount },
+          details: { txHash: sweepTxHash },
         });
 
         console.log(`✅ Sweep terminé: ${payment.paymentId} → tx: ${sweepTxHash}`);

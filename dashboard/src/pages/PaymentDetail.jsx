@@ -42,13 +42,10 @@ export default function PaymentDetail() {
   }
 
   useEffect(() => {
-    Promise.all([
-      api.get(`/payments/${id}`),
-      api.get(`/payments/${id}/history`),
-    ])
-      .then(([payRes, histRes]) => {
-        setPayment(payRes.data.payment)
-        setHistory(histRes.data.history)
+    api.get(`/payments/${id}`)
+      .then(res => {
+        setPayment(res.data.payment)
+        setHistory(res.data.history)
       })
       .catch(() => setError('Failed to load payment details'))
       .finally(() => setLoading(false))

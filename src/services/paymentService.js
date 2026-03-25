@@ -57,7 +57,6 @@ class PaymentService {
     await AuditLog.log({
       paymentId: payment.paymentId,
       action: 'payment_created',
-      details: { amount, wallet: wallet.address, expiresAt },
       req,
     });
 
