@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import api from '../hooks/useApi'
 import StatusBadge from '../components/StatusBadge'
 import Pagination from '../components/Pagination'
 import { formatUSDT, formatDateTime, getDayRange } from '../utils/formatters'
+import CreatePaymentModal from '../components/CreatePaymentModal'
 
 const STATUS_OPTIONS = ['', 'pending', 'confirming', 'confirmed', 'expired', 'swept', 'failed']
 
@@ -16,6 +18,7 @@ export default function Payments() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filters, setFilters] = useState({ status: '', from: '', to: '' })
+  const [showCreate, setShowCreate] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -42,7 +45,16 @@ export default function Payments() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-gray-100">Payments</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-gray-100">Payments</h1>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors"
+        >
+          <Plus size={16} />
+          New Payment
+        </button>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
@@ -121,6 +133,10 @@ export default function Payments() {
         <p className="text-sm text-gray-400">{total} total payments</p>
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </div>
+
+      {showCreate && (
+        <CreatePaymentModal onClose={() => setShowCreate(false)} />
+      )}
     </div>
   )
 }
