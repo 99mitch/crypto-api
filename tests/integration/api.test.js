@@ -168,7 +168,7 @@ describe('POST /api/payments/:paymentId/cancel', () => {
 
     const res = await request.post(`/api/payments/${paymentId}/cancel`);
     expect(res.status).toBe(200);
-    expect(res.body.payment.status).toEqual('expired');
+    expect(res.body.payment.status).toEqual('cancelled');
   });
 
   it('ne peut pas annuler un paiement inexistant', async () => {

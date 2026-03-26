@@ -64,15 +64,15 @@ class TronService {
    * @returns {Array} Liste des transactions TRC-20
    */
   async getIncomingUSDTTransactions(address, sinceTimestamp = 0) {
-    try {
-      const url = `${config.tron.fullHost}/v1/accounts/${address}/transactions/trc20`;
+    const _fetch = async (withTimestamp) => {
       const params = {
         only_to: true,
         limit: 50,
         contract_address: this.usdtContract,
       };
-      if (sinceTimestamp > 0) {
-        params.min_timestamp = sinceTimestamp;
+      // Recule de 2 min pour absorber les décalages d'horloge TronGrid
+      if (withTimestamp && sinceTimestamp > 0) {
+        params.min_timestamp = sinceTimestamp - 120000;
       }
 
       const response = await this.tronWeb.fullNode.request(
@@ -81,29 +81,39 @@ class TronService {
         'get'
       );
 
-      if (!response || !response.data) return [];
+      if (!response?.data?.length) return [];
 
-      return response.data
-        .map((tx) => {
-          // tx.from et tx.to peuvent être en hex (41...) ou base58 (T...) selon la version TronGrid
-          let from = tx.from;
-          if (from && from.startsWith('41')) {
-            try { from = TronWeb.address.fromHex(from); } catch (_) {}
-          }
-          let to = tx.to;
-          if (to && to.startsWith('41')) {
-            try { to = TronWeb.address.fromHex(to); } catch (_) {}
-          }
-          return {
-            txHash: tx.transaction_id,
-            from,
-            to,
-            amount: Number(tx.value) / 1e6,
-            timestamp: tx.block_timestamp,
-            confirmed: tx.confirmed ?? true,
-          };
-        })
-        .filter((tx) => tx.to === address);
+      return response.data.map((tx) => {
+        let from = tx.from;
+        if (from?.startsWith('41')) {
+          try { from = TronWeb.address.fromHex(from); } catch (_) {}
+        }
+        let to = tx.to;
+        if (to?.startsWith('41')) {
+          try { to = TronWeb.address.fromHex(to); } catch (_) {}
+        }
+        return {
+          txHash: tx.transaction_id,
+          from,
+          to,
+          amount: Number(tx.value) / 1e6,
+          timestamp: tx.block_timestamp,
+          confirmed: tx.confirmed ?? true,
+        };
+      }).filter((tx) => tx.to === address);
+    };
+
+    try {
+      // 1er essai avec filtre timestamp
+      let txs = await _fetch(true);
+
+      // Fallback sans timestamp si rien trouvé (délai TronGrid)
+      if (!txs.length && sinceTimestamp > 0) {
+        console.log(`⚠️ Aucune tx trouvée avec timestamp pour ${address}, retry sans filtre...`);
+        txs = await _fetch(false);
+      }
+
+      return txs;
     } catch (error) {
       console.error(`Erreur getIncomingUSDTTransactions pour ${address}:`, error.message);
       return [];

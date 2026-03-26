@@ -15,6 +15,9 @@ router.use(adminLimiter);
 // Stats globales
 router.get('/stats', adminController.getStats);
 
+// Breakdown journalier (remplace N requêtes par une)
+router.get('/stats/daily', adminController.getDailyStats);
+
 // Créer un paiement (depuis le dashboard admin)
 router.post('/payments', paymentController.create);
 

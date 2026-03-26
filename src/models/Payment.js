@@ -20,7 +20,7 @@ const paymentSchema = new mongoose.Schema(
     // Statut du paiement
     status: {
       type: String,
-      enum: ['pending', 'confirming', 'confirmed', 'expired', 'swept', 'failed'],
+      enum: ['pending', 'confirming', 'confirmed', 'expired', 'cancelled', 'swept', 'failed'],
       default: 'pending',
       index: true,
     },
@@ -43,6 +43,8 @@ const paymentSchema = new mongoose.Schema(
 
     // Sweep info
     sweepTxHash: { type: String, default: null },
+    feesAmount: { type: Number, default: null },
+    feesTxHash: { type: String, default: null },
     sweepStatus: {
       type: String,
       enum: ['pending', 'processing', 'completed', 'failed', null],
@@ -110,6 +112,8 @@ paymentSchema.methods.toAdminJSON = function () {
     ...this.toPublicJSON(),
     confirmations: this.confirmations,
     sweepTxHash: this.sweepTxHash,
+    feesAmount: this.feesAmount,
+    feesTxHash: this.feesTxHash,
     webhookSentAt: this.webhookSentAt,
     webhookAttempts: this.webhookAttempts,
   };

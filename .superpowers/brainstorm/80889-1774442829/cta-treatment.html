@@ -1,0 +1,78 @@
+<h2>Buttons & Active States</h2>
+<p class="subtitle">The green is gone. How should interactive elements stand out?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="white-fill" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a0a;padding:16px;font-family:system-ui">
+      <!-- Nav item active -->
+      <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#f5f5f5">
+          <div style="width:14px;height:14px;background:#0a0a0a;border-radius:2px"></div>
+          <span style="font-size:12px;color:#0a0a0a;font-weight:600">Dashboard</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px">
+          <div style="width:14px;height:14px;background:#555;border-radius:2px"></div>
+          <span style="font-size:12px;color:#666">Payments</span>
+        </div>
+      </div>
+      <!-- Primary button -->
+      <button style="width:100%;padding:8px;background:#f5f5f5;color:#0a0a0a;border:none;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:8px">New Payment</button>
+      <!-- Secondary button -->
+      <button style="width:100%;padding:8px;background:transparent;color:#888;border:1px solid #2a2a2a;border-radius:8px;font-size:12px">Cancel</button>
+    </div>
+    <div class="card-body">
+      <h3>A — White Fill</h3>
+      <p>Active nav = white pill. Primary button = white background, black text. High contrast, clean inversion.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="white-outline" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a0a;padding:16px;font-family:system-ui">
+      <!-- Nav item active -->
+      <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border-left:2px solid #f5f5f5">
+          <div style="width:14px;height:14px;background:#f5f5f5;border-radius:2px"></div>
+          <span style="font-size:12px;color:#f5f5f5;font-weight:600">Dashboard</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px">
+          <div style="width:14px;height:14px;background:#555;border-radius:2px"></div>
+          <span style="font-size:12px;color:#666">Payments</span>
+        </div>
+      </div>
+      <!-- Primary button -->
+      <button style="width:100%;padding:8px;background:transparent;color:#f5f5f5;border:1px solid #f5f5f5;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:8px">New Payment</button>
+      <!-- Secondary button -->
+      <button style="width:100%;padding:8px;background:transparent;color:#555;border:1px solid #2a2a2a;border-radius:8px;font-size:12px">Cancel</button>
+    </div>
+    <div class="card-body">
+      <h3>B — White Outline</h3>
+      <p>Active nav = left border + bright text. Primary button = white outline. Subtler, less contrasty feel.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="grey-accent" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0a0a0a;padding:16px;font-family:system-ui">
+      <!-- Nav item active -->
+      <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;background:#222">
+          <div style="width:14px;height:14px;background:#aaa;border-radius:2px"></div>
+          <span style="font-size:12px;color:#e0e0e0;font-weight:600">Dashboard</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px">
+          <div style="width:14px;height:14px;background:#555;border-radius:2px"></div>
+          <span style="font-size:12px;color:#555">Payments</span>
+        </div>
+      </div>
+      <!-- Primary button -->
+      <button style="width:100%;padding:8px;background:#2a2a2a;color:#e0e0e0;border:1px solid #3a3a3a;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:8px">New Payment</button>
+      <!-- Secondary button -->
+      <button style="width:100%;padding:8px;background:transparent;color:#555;border:1px solid #222;border-radius:8px;font-size:12px">Cancel</button>
+    </div>
+    <div class="card-body">
+      <h3>C — Grey Accent</h3>
+      <p>Active nav = slightly elevated dark bg. Primary button = raised dark grey. Understated, maximum restraint.</p>
+    </div>
+  </div>
+
+</div>

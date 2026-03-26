@@ -73,8 +73,8 @@ class RateLimiter {
 const limiter = new RateLimiter();
 
 module.exports = {
-  // Rate limit global : 60 req/min
-  globalLimiter: limiter.middleware({ windowMs: 60000, max: 60 }),
+  // Rate limit global : 300 req/min
+  globalLimiter: limiter.middleware({ windowMs: 60000, max: 300 }),
 
   // Rate limit création de paiement : 10/min (anti-spam)
   paymentCreateLimiter: limiter.middleware({

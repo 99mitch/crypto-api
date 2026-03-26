@@ -162,7 +162,7 @@ class PaymentService {
   async cancelPayment(paymentId) {
     const payment = await Payment.findOneAndUpdate(
       { paymentId, status: 'pending' },
-      { status: 'expired' },
+      { status: 'cancelled' },
       { new: true }
     );
     return payment ? payment.toAdminJSON() : null;

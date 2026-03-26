@@ -78,9 +78,11 @@ class PaymentMonitor {
    * Expire les paiements dépassés
    */
   async _expirePendingPayments() {
+    // On n'expire qu'après le délai de grâce pour absorber les paiements tardifs
+    const graceCutoff = new Date(Date.now() - config.payment.gracePeriodSeconds * 1000);
     const expiredPayments = await Payment.find({
       status: 'pending',
-      expiresAt: { $lte: new Date() },
+      expiresAt: { $lte: graceCutoff },
     });
 
     if (expiredPayments.length > 0) {
@@ -101,9 +103,11 @@ class PaymentMonitor {
    * Vérifie les paiements en attente pour détecter les réceptions USDT
    */
   async _checkPendingPayments() {
+    // Inclut les paiements dans le délai de grâce (expiresAt dépassé depuis moins de gracePeriod)
+    const graceCutoff = new Date(Date.now() - config.payment.gracePeriodSeconds * 1000);
     const pendingPayments = await Payment.find({
       status: 'pending',
-      expiresAt: { $gt: new Date() },
+      expiresAt: { $gt: graceCutoff },
     });
 
     for (const payment of pendingPayments) {
@@ -115,8 +119,11 @@ class PaymentMonitor {
         if (balance >= minAccepted) {
           // Paiement reçu !
           const isPartial = balance < payment.amount;
+          const isOverpaid = balance > payment.amount;
+          const isLate = new Date() > payment.expiresAt;
           console.log(
-            `✅ Paiement reçu: ${payment.paymentId} - ${balance}/${payment.amount} USDT${isPartial ? ' (tolérance appliquée)' : ''}`
+            `✅ Paiement reçu: ${payment.paymentId} - ${balance}/${payment.amount} USDT` +
+            `${isPartial ? ' (tolérance)' : ''}${isOverpaid ? ' (sur-paiement)' : ''}${isLate ? ' (tardif)' : ''}`
           );
 
           // Récupérer le hash de la transaction
@@ -125,10 +132,12 @@ class PaymentMonitor {
             payment.createdAt.getTime()
           );
 
-          const matchingTx = txs.find((tx) => tx.amount >= payment.amount);
+          const matchingTx = txs.find((tx) => tx.amount >= minAccepted);
 
           payment.status = 'confirmed';
-          payment.receivedAmount = balance;
+          // Sur-paiement : on crédite uniquement le montant demandé côté PHP
+          // Le sweep récupérera le solde réel complet
+          payment.receivedAmount = isOverpaid ? payment.amount : balance;
           payment.txHash = matchingTx?.txHash || null;
           payment.senderAddress = matchingTx?.from || null;
           payment.confirmations = 1;
@@ -202,6 +211,10 @@ class PaymentMonitor {
         // Déchiffrer la clé privée
         const privateKey = this._decryptPrivateKey(payment.wallet.privateKey);
 
+        // Re-fetch le solde réel pour sweeper tout (couvre le sur-paiement)
+        const actualBalance = await tronService.getUSDTBalance(payment.wallet.address);
+        const sweepTotal = Math.floor(actualBalance * 1e6) / 1e6;
+
         const hasFees = config.fees.walletAddress && config.fees.percentage > 0;
         const nbTransfers = hasFees ? 2 : 1;
 
@@ -210,11 +223,11 @@ class PaymentMonitor {
 
         let feesAmount = null;
         let feesTxHash = null;
+        let sweepTxHash;
 
         if (hasFees) {
-          // Arrondi à 6 décimales (précision USDT TRC-20)
-          feesAmount = Math.floor(payment.receivedAmount * config.fees.percentage * 1e6) / 1e6;
-          const netAmount = Math.floor((payment.receivedAmount - feesAmount) * 1e6) / 1e6;
+          feesAmount = Math.floor(sweepTotal * config.fees.percentage * 1e6) / 1e6;
+          const netAmount = Math.floor((sweepTotal - feesAmount) * 1e6) / 1e6;
 
           console.log(`💰 Frais: ${feesAmount} USDT (${config.fees.percentage * 100}%) → fees wallet`);
 
@@ -227,17 +240,17 @@ class PaymentMonitor {
 
           await this._sleep(3000);
 
-          var sweepTxHash = await tronService.sweepUSDT(
+          sweepTxHash = await tronService.sweepUSDT(
             privateKey,
             payment.wallet.address,
             netAmount,
             config.tron.centralWallet.address
           );
         } else {
-          var sweepTxHash = await tronService.sweepUSDT(
+          sweepTxHash = await tronService.sweepUSDT(
             privateKey,
             payment.wallet.address,
-            payment.receivedAmount,
+            sweepTotal,
             config.tron.centralWallet.address
           );
         }

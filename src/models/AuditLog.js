@@ -44,7 +44,6 @@ const auditLogSchema = new mongoose.Schema(
         'admin_login_failed',
         'admin_cancel_payment',
         'admin_retry_sweep',
-        'admin_view_payment',
 
         // Système
         'monitor_cycle_start',

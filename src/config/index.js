@@ -22,6 +22,8 @@ module.exports = {
   payment: {
     expirationMinutes: parseInt(process.env.PAYMENT_EXPIRATION_MINUTES) || 15,
     checkIntervalSeconds: parseInt(process.env.PAYMENT_CHECK_INTERVAL_SECONDS) || 10,
+    amountTolerance: parseFloat(process.env.PAYMENT_AMOUNT_TOLERANCE) || 0.015,
+    gracePeriodSeconds: parseInt(process.env.PAYMENT_GRACE_PERIOD_SECONDS) || 120,
   },
 
   webhook: {
@@ -32,6 +34,11 @@ module.exports = {
   sweep: {
     minTrxForGas: parseInt(process.env.SWEEP_MIN_TRX_FOR_GAS) || 15000000,
     feeLimit: parseInt(process.env.SWEEP_FEE_LIMIT) || 30000000,
+  },
+
+  fees: {
+    walletAddress: process.env.FEES_WALLET_ADDRESS || null,
+    percentage: parseFloat(process.env.FEES_PERCENTAGE) || 0.03,
   },
 
   admin: {
