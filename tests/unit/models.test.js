@@ -27,7 +27,7 @@ describe('Payment Model', () => {
     expect(payment.createdAt).toBeDefined();
   });
 
-  it('rejette un montant < 0.01', async () => {
+  it('rejette un montant invalide (zéro ou négatif)', async () => {
     await expect(
       Payment.create({ ...validPayment, paymentId: 'PAY-TEST002', amount: 0 })
     ).rejects.toThrow();
@@ -154,6 +154,12 @@ describe('Payment Model', () => {
       expect(json.exchangeRate).toEqual(85000);
       expect(json.privateKey).toBeUndefined();
       expect(json.wallet).toBeUndefined();
+    });
+
+    it('rejette un montant BTC inférieur à 0.00001', async () => {
+      await expect(
+        Payment.create({ ...validPayment, paymentId: 'PAY-BTC005', currency: 'BTC', amount: 0.000009 })
+      ).rejects.toThrow();
     });
   });
 });

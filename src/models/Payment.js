@@ -105,6 +105,7 @@ const paymentSchema = new mongoose.Schema(
     requiredConfirmations: {
       type: Number,
       default: 1,
+      min: 1,
     },
   },
   {
