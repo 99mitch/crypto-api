@@ -18,3 +18,4 @@ Thumbs.db
 
 # Coverage
 coverage/
+.worktrees/
