@@ -101,6 +101,10 @@ describe('btcService.getTransactionConfirmations()', () => {
     axios.get.mockResolvedValueOnce({ data: { confirmations: 2 } });
     const confs = await btcService.getTransactionConfirmations('abc123');
     expect(confs).toEqual(2);
+    expect(axios.get).toHaveBeenCalledWith(
+      expect.stringContaining('/txs/abc123'),
+      expect.any(Object)
+    );
   });
 
   it('retourne 0 si la transaction est introuvable', async () => {

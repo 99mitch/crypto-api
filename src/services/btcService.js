@@ -62,10 +62,10 @@ class BtcService {
   /**
    * Transactions BTC reçues (non dépensées) sur une adresse
    * @param {string} address
-   * @param {number} sinceTimestamp
+   * @param {number} _sinceTimestamp - Ignoré (Blockcypher ne supporte pas le filtre par date). Présent pour compatibilité d'interface avec tronService.
    * @returns {Promise<Array<{ txHash, amount, confirmations, timestamp }>>}
    */
-  async getIncomingTransactions(address, sinceTimestamp) {
+  async getIncomingTransactions(address, _sinceTimestamp) {
     try {
       const resp = await axios.get(`${this.baseUrl}/addrs/${address}`, {
         params: this._tokenParams(),
