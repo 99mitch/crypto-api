@@ -98,6 +98,25 @@ class PaymentMonitor {
 
       console.log(`⏰ ${expiredPayments.length} paiement(s) expiré(s)`);
     }
+
+    // Expirer les paiements BTC bloqués en 'confirming' depuis plus de 24h
+    const confirmingCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const stalledConfirming = await Payment.find({
+      status: 'confirming',
+      currency: 'BTC',
+      confirmingAt: { $lt: confirmingCutoff },
+    });
+
+    for (const payment of stalledConfirming) {
+      payment.status = 'expired';
+      await payment.save();
+      console.log(`⏰ BTC paiement confirming expiré (>24h): ${payment.paymentId}`);
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_expired',
+        details: { reason: 'confirming_timeout_24h' },
+      });
+    }
   }
 
   /**

@@ -172,7 +172,18 @@ class PaymentService {
       Payment.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
       Payment.aggregate([
         { $match: { status: { $in: ['confirmed', 'swept'] } } },
-        { $group: { _id: null, total: { $sum: '$receivedAmount' } } },
+        {
+          $addFields: {
+            usdValue: {
+              $cond: {
+                if: { $eq: ['$currency', 'BTC'] },
+                then: '$usdAmount',
+                else: '$receivedAmount',
+              },
+            },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$usdValue' } } },
       ]),
       Payment.aggregate([
         {
@@ -181,7 +192,18 @@ class PaymentService {
             status: { $in: ['confirmed', 'swept'] },
           },
         },
-        { $group: { _id: null, total: { $sum: '$receivedAmount' }, count: { $sum: 1 } } },
+        {
+          $addFields: {
+            usdValue: {
+              $cond: {
+                if: { $eq: ['$currency', 'BTC'] },
+                then: '$usdAmount',
+                else: '$receivedAmount',
+              },
+            },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$usdValue' }, count: { $sum: 1 } } },
       ]),
     ]);
 
