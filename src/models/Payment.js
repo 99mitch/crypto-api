@@ -10,11 +10,21 @@ const paymentSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Montant attendu en USDT
+    // Montant attendu en USDT ou BTC
     amount: {
       type: Number,
       required: true,
-      min: 0.01,
+      validate: {
+        validator: function (value) {
+          // USDT min 0.01, BTC min 0.00001
+          const minAmount = this.currency === 'BTC' ? 0.00001 : 0.01;
+          return value >= minAmount;
+        },
+        message: function (props) {
+          const minAmount = this.currency === 'BTC' ? 0.00001 : 0.01;
+          return `amount must be at least ${minAmount}`;
+        },
+      },
     },
 
     // Statut du paiement
@@ -70,6 +80,32 @@ const paymentSchema = new mongoose.Schema(
 
     // Référence externe (idempotence) — ex: "recharge-USR123-1743200000"
     externalRef: { type: String, default: null, index: true, sparse: true },
+
+    // Devise du paiement
+    currency: {
+      type: String,
+      enum: ['USDT', 'BTC'],
+      default: 'USDT',
+      index: true,
+    },
+
+    // Montant en USD passé par le marchand (= amount pour USDT, ≠ amount pour BTC)
+    usdAmount: {
+      type: Number,
+      default: null,
+    },
+
+    // Taux de change USD/crypto au moment de la création (null pour USDT)
+    exchangeRate: {
+      type: Number,
+      default: null,
+    },
+
+    // Confirmations blockchain requises pour valider (1 USDT, 3 BTC)
+    requiredConfirmations: {
+      type: Number,
+      default: 1,
+    },
   },
   {
     timestamps: true, // createdAt, updatedAt
@@ -89,7 +125,10 @@ paymentSchema.methods.isExpired = function () {
 paymentSchema.methods.toPublicJSON = function () {
   return {
     paymentId: this.paymentId,
+    currency: this.currency,
     amount: this.amount,
+    usdAmount: this.usdAmount,
+    exchangeRate: this.exchangeRate,
     status: this.status,
     walletAddress: this.wallet.address,
     qrCode: this.qrCode,

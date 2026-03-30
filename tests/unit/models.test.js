@@ -106,6 +106,56 @@ describe('Payment Model', () => {
       expect(json.webhookAttempts).toEqual(2);
     });
   });
+
+  describe('BTC payment fields', () => {
+    it('accepte currency BTC avec usdAmount et exchangeRate', async () => {
+      const payment = await Payment.create({
+        ...validPayment,
+        paymentId: 'PAY-BTC001',
+        currency: 'BTC',
+        usdAmount: 25.00,
+        amount: 0.00029412,
+        exchangeRate: 85000,
+        requiredConfirmations: 3,
+      });
+      expect(payment.currency).toEqual('BTC');
+      expect(payment.usdAmount).toEqual(25.00);
+      expect(payment.exchangeRate).toEqual(85000);
+      expect(payment.requiredConfirmations).toEqual(3);
+    });
+
+    it('currency USDT et requiredConfirmations 1 par défaut', async () => {
+      const payment = await Payment.create({
+        ...validPayment,
+        paymentId: 'PAY-BTC002',
+      });
+      expect(payment.currency).toEqual('USDT');
+      expect(payment.requiredConfirmations).toEqual(1);
+    });
+
+    it('rejette une currency invalide', async () => {
+      await expect(
+        Payment.create({ ...validPayment, paymentId: 'PAY-BTC003', currency: 'ETH' })
+      ).rejects.toThrow();
+    });
+
+    it('toPublicJSON inclut currency, usdAmount et exchangeRate', async () => {
+      const payment = await Payment.create({
+        ...validPayment,
+        paymentId: 'PAY-BTC004',
+        currency: 'BTC',
+        usdAmount: 25.00,
+        amount: 0.00029412,
+        exchangeRate: 85000,
+      });
+      const json = payment.toPublicJSON();
+      expect(json.currency).toEqual('BTC');
+      expect(json.usdAmount).toEqual(25.00);
+      expect(json.exchangeRate).toEqual(85000);
+      expect(json.privateKey).toBeUndefined();
+      expect(json.wallet).toBeUndefined();
+    });
+  });
 });
 
 describe('AuditLog Model', () => {
