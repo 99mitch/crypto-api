@@ -16,10 +16,10 @@ class QRCodeService {
       darkColor = '#000000',
       lightColor = '#ffffff',
       format = 'datauri', // 'datauri' | 'buffer' | 'svg'
+      currency = 'USDT',
     } = options;
 
-    // URI compatible wallets Tron (TronLink, Trust Wallet, etc.)
-    const paymentUri = this._buildPaymentUri(address, amount);
+    const paymentUri = this._buildPaymentUri(address, amount, currency);
 
     const qrOptions = {
       width,
@@ -67,15 +67,19 @@ class QRCodeService {
   }
 
   /**
-   * Construit l'URI de paiement
+   * Construit l'URI de paiement selon la devise
+   * - USDT: juste l'adresse (wallets Tron ne supportent pas l'URI TRC-20 étendu)
+   * - BTC: BIP21 — bitcoin:<address>?amount=<btc>
    * @param {string} address
-   * @param {number} amount
+   * @param {number} amount - Montant dans la devise native
+   * @param {string} currency
    * @returns {string}
    */
-  _buildPaymentUri(address, amount) {
-    // Format simple: juste l'adresse
-    // La plupart des wallets ne supportent pas le format URI étendu pour TRC-20
-    // Donc on garde l'adresse simple pour maximiser la compatibilité
+  _buildPaymentUri(address, amount, currency = 'USDT') {
+    if (currency === 'BTC') {
+      const btcAmount = parseFloat(amount.toFixed(8));
+      return `bitcoin:${address}?amount=${btcAmount}`;
+    }
     return address;
   }
 }
