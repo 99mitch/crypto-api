@@ -62,6 +62,12 @@ const paymentSchema = new mongoose.Schema(
     },
     sweepRetryCount: { type: Number, default: 0 },
 
+    // Timestamp du passage en statut 'confirming' (BTC uniquement)
+    confirmingAt: {
+      type: Date,
+      default: null,
+    },
+
     // Expiration
     expiresAt: { type: Date, required: true, index: true },
 

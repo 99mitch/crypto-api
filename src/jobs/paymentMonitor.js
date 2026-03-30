@@ -106,11 +106,21 @@ class PaymentMonitor {
   async _checkPendingPayments() {
     const graceCutoff = new Date(Date.now() - config.payment.gracePeriodSeconds * 1000);
 
+    const confirmingCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
     // Inclut les paiements BTC 'confirming' (attente de confirmations supplémentaires)
+    // Les paiements confirming de plus de 24h sont ignorés (tx probablement droppée du mempool)
     const paymentsToCheck = await Payment.find({
       $or: [
         { status: 'pending', expiresAt: { $gt: graceCutoff } },
-        { status: 'confirming', currency: 'BTC' },
+        {
+          status: 'confirming',
+          currency: 'BTC',
+          $or: [
+            { confirmingAt: { $exists: false } },
+            { confirmingAt: { $gt: confirmingCutoff } },
+          ],
+        },
       ],
     });
 
@@ -239,6 +249,7 @@ class PaymentMonitor {
     } else if (payment.status === 'pending' && confirmations >= 1) {
       // Première confirmation — passer en confirming
       payment.status = 'confirming';
+      payment.confirmingAt = new Date();
       await payment.save();
       console.log(
         `🔄 BTC confirming: ${payment.paymentId} (${confirmations}/${payment.requiredConfirmations} confirmation(s))`
@@ -298,16 +309,17 @@ class PaymentMonitor {
         });
 
         // Planifier un retry intelligent
-        retryService.scheduleSweepRetry(payment, (pk, addr, amt) => {
+        retryService.scheduleSweepRetry(payment, async (pk, addr, amt) => {
           const decryptedKey = this._decryptPrivateKey(pk);
           if (payment.currency === 'BTC') {
-            return btcService.sweepBTC(
+            const { txHash } = await btcService.sweepBTC(
               decryptedKey,
               addr,
               config.btc.centralWallet.address,
               config.btc.feesWalletAddress,
               config.fees.percentage
             );
+            return txHash;
           }
           return tronService.sweepUSDT(decryptedKey, addr, amt);
         });
