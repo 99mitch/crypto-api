@@ -7,26 +7,37 @@ class PaymentController {
    */
   async create(req, res) {
     try {
-      const { amount, metadata, description, externalRef } = req.body;
+      const { amount, currency = 'USDT', metadata, description, externalRef } = req.body;
+      const normalizedCurrency = currency.toUpperCase();
+
+      if (!['USDT', 'BTC'].includes(normalizedCurrency)) {
+        return res.status(400).json({
+          error: `Devise non supportée: ${currency}. Valeurs acceptées: USDT, BTC`,
+        });
+      }
 
       if (!amount || amount <= 0) {
         return res.status(400).json({ error: 'Montant invalide. Doit être > 0.' });
       }
 
-      if (amount < 0.01) {
+      if (normalizedCurrency === 'USDT' && amount < 0.01) {
         return res.status(400).json({ error: 'Montant minimum: 0.01 USDT' });
       }
 
+      if (normalizedCurrency === 'BTC' && amount < 1) {
+        return res.status(400).json({
+          error: 'Montant minimum: 1 USD pour les paiements BTC',
+        });
+      }
+
       const payment = await paymentService.createPayment(amount, {
+        currency: normalizedCurrency,
         metadata,
         description,
         externalRef,
       }, req);
 
-      return res.status(201).json({
-        success: true,
-        payment,
-      });
+      return res.status(201).json({ success: true, payment });
     } catch (error) {
       console.error('Erreur création paiement:', error);
       return res.status(500).json({ error: 'Erreur interne' });
