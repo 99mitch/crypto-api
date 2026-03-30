@@ -103,6 +103,105 @@ class BtcService {
       return 0;
     }
   }
+
+  /**
+   * Sweep tous les UTXOs confirmés d'une adresse vers le wallet central.
+   * Les frais réseau sont déduits du montant net (pas des fees).
+   * Si feesPercentage > 0 et feesWalletAddress fourni : 2 outputs dans la même tx.
+   *
+   * @param {string} privateKeyWIF - Clé privée WIF du wallet source
+   * @param {string} fromAddress - Adresse source (bc1q...)
+   * @param {string} toAddress - Wallet central de destination
+   * @param {string|null} feesWalletAddress - Wallet de frais (null = aucun frais)
+   * @param {number} feesPercentage - Ex: 0.03 pour 3% (0 = aucun frais)
+   * @returns {Promise<{ txHash: string, feesAmount: number }>}
+   */
+  async sweepBTC(privateKeyWIF, fromAddress, toAddress, feesWalletAddress, feesPercentage) {
+    const tokenParams = this._tokenParams();
+
+    // 1. UTXOs confirmés
+    const utxoResp = await axios.get(`${this.baseUrl}/addrs/${fromAddress}`, {
+      params: { ...tokenParams, unspentOnly: true },
+      timeout: 10000,
+    });
+    const utxos = (utxoResp.data.txrefs || []).filter(u => !u.spent);
+    if (utxos.length === 0) {
+      throw new Error(`Aucun UTXO disponible pour ${fromAddress}`);
+    }
+
+    // 2. Fee rate (sat/kb)
+    const chainResp = await axios.get(this.baseUrl, {
+      params: tokenParams,
+      timeout: 10000,
+    });
+    const feePerKb = chainResp.data.medium_fee_per_kb || 10000;
+
+    // 3. Taille estimée de la tx (vbytes)
+    // P2WPKH : ~68 vbytes/input, ~31 vbytes/output, 11 vbytes overhead
+    const withFees = feesPercentage > 0 && feesWalletAddress;
+    const numOutputs = withFees ? 2 : 1;
+    const estimatedVbytes = 11 + utxos.length * 68 + numOutputs * 31;
+    const networkFeesSats = Math.ceil((estimatedVbytes / 1000) * feePerKb);
+
+    // 4. Montants en satoshis
+    const totalSats = utxos.reduce((sum, u) => sum + u.value, 0);
+    const feesSats = withFees ? Math.floor(totalSats * feesPercentage) : 0;
+    const netSats = totalSats - feesSats - networkFeesSats;
+
+    if (netSats <= 546) {
+      throw new Error(
+        `Solde insuffisant pour couvrir les frais réseau (net: ${netSats} sats, minimum: 546 sats)`
+      );
+    }
+
+    // 5. Construire la PSBT
+    const keyPair = ECPair.fromWIF(privateKeyWIF, this.network);
+    const p2wpkh = bitcoin.payments.p2wpkh({
+      pubkey: keyPair.publicKey,
+      network: this.network,
+    });
+
+    const psbt = new bitcoin.Psbt({ network: this.network });
+
+    for (const utxo of utxos) {
+      // tx_hash must be a 32-byte Buffer; convert hex string and zero-pad to exactly 32 bytes
+      const hashBytes = Buffer.from(utxo.tx_hash, 'hex');
+      const hashBuf = Buffer.alloc(32);
+      hashBytes.copy(hashBuf, Math.max(0, 32 - hashBytes.length));
+      psbt.addInput({
+        hash: hashBuf,
+        index: utxo.tx_output_n,
+        witnessUtxo: {
+          script: p2wpkh.output,
+          value: BigInt(utxo.value),
+        },
+      });
+    }
+
+    if (feesSats > 0) {
+      psbt.addOutput({ address: feesWalletAddress, value: BigInt(feesSats) });
+    }
+    psbt.addOutput({ address: toAddress, value: BigInt(netSats) });
+
+    psbt.signAllInputs(keyPair);
+    psbt.finalizeAllInputs();
+    const txHex = psbt.extractTransaction().toHex();
+
+    // 6. Broadcast
+    const broadcastResp = await axios.post(
+      `${this.baseUrl}/txs/push`,
+      { tx: txHex },
+      { params: tokenParams, timeout: 15000 }
+    );
+
+    const txHash = broadcastResp.data.tx.hash;
+    console.log(`BTC Sweep: ${fromAddress} -> ${toAddress} (tx: ${txHash})`);
+
+    return {
+      txHash,
+      feesAmount: feesSats / 1e8,
+    };
+  }
 }
 
 module.exports = new BtcService();

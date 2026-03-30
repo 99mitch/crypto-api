@@ -8,6 +8,7 @@ beforeEach(() => {
   // Mock axios BEFORE requiring btcService
   jest.mock('axios', () => ({
     get: jest.fn(),
+    post: jest.fn(),
   }));
 
   axios = require('axios');
@@ -111,5 +112,75 @@ describe('btcService.getTransactionConfirmations()', () => {
     axios.get.mockRejectedValueOnce(new Error('Not found'));
     const confs = await btcService.getTransactionConfirmations('abc123');
     expect(confs).toEqual(0);
+  });
+});
+
+describe('btcService.sweepBTC()', () => {
+  it('construit et broadcast une tx avec 2 outputs (fees + central)', async () => {
+    const wallet = btcService.generateWallet();
+    const destWallet = btcService.generateWallet();
+    const feesWallet = btcService.generateWallet();
+
+    // Mock UTXOs
+    axios.get.mockResolvedValueOnce({
+      data: {
+        txrefs: [{ tx_hash: 'utxo_hash1', tx_output_n: 0, value: 100000, spent: false }],
+      },
+    });
+    // Mock fee rate
+    axios.get.mockResolvedValueOnce({ data: { medium_fee_per_kb: 10000 } });
+    // Mock broadcast
+    axios.post.mockResolvedValueOnce({ data: { tx: { hash: 'sweep_tx_hash' } } });
+
+    const result = await btcService.sweepBTC(
+      wallet.privateKeyWIF,
+      wallet.address,
+      destWallet.address,
+      feesWallet.address,
+      0.03
+    );
+
+    expect(result.txHash).toEqual('sweep_tx_hash');
+    expect(result.feesAmount).toBeGreaterThan(0);
+    expect(axios.post).toHaveBeenCalledWith(
+      expect.stringContaining('/txs/push'),
+      expect.objectContaining({ tx: expect.any(String) }),
+      expect.any(Object)
+    );
+  });
+
+  it('sweep sans frais (feesPercentage = 0) avec 1 seul output', async () => {
+    const wallet = btcService.generateWallet();
+    const destWallet = btcService.generateWallet();
+
+    axios.get.mockResolvedValueOnce({
+      data: {
+        txrefs: [{ tx_hash: 'utxo_hash2', tx_output_n: 0, value: 50000, spent: false }],
+      },
+    });
+    axios.get.mockResolvedValueOnce({ data: { medium_fee_per_kb: 10000 } });
+    axios.post.mockResolvedValueOnce({ data: { tx: { hash: 'sweep_tx2' } } });
+
+    const result = await btcService.sweepBTC(
+      wallet.privateKeyWIF,
+      wallet.address,
+      destWallet.address,
+      null,
+      0
+    );
+
+    expect(result.txHash).toEqual('sweep_tx2');
+    expect(result.feesAmount).toEqual(0);
+  });
+
+  it('throw si aucun UTXO disponible', async () => {
+    const wallet = btcService.generateWallet();
+    const destWallet = btcService.generateWallet();
+
+    axios.get.mockResolvedValueOnce({ data: {} });
+
+    await expect(
+      btcService.sweepBTC(wallet.privateKeyWIF, wallet.address, destWallet.address, null, 0)
+    ).rejects.toThrow('Aucun UTXO disponible');
   });
 });
