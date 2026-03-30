@@ -41,6 +41,21 @@ module.exports = {
     percentage: parseFloat(process.env.FEES_PERCENTAGE) || 0.03,
   },
 
+  btc: {
+    network: process.env.BTC_NETWORK || 'mainnet',
+    blockcypherToken: process.env.BLOCKCYPHER_TOKEN || '',
+    centralWallet: {
+      address: process.env.BTC_CENTRAL_WALLET_ADDRESS,
+      wif: process.env.BTC_CENTRAL_WALLET_WIF,
+    },
+    feesWalletAddress: process.env.BTC_FEES_WALLET_ADDRESS || null,
+    payment: {
+      expirationMinutes: parseInt(process.env.BTC_PAYMENT_EXPIRATION_MINUTES) || 60,
+      requiredConfirmations: parseInt(process.env.BTC_REQUIRED_CONFIRMATIONS) || 3,
+      amountTolerance: parseFloat(process.env.BTC_AMOUNT_TOLERANCE) || 0.015,
+    },
+  },
+
   admin: {
     apiKey: process.env.ADMIN_API_KEY,
     password: process.env.ADMIN_PASSWORD || 'changeme',
