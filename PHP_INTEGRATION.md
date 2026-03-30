@@ -80,6 +80,7 @@ class CryptoPayAPI {
 
 ### 1. Créer un paiement
 
+**USDT (défaut) :**
 ```php
 $api = new CryptoPayAPI($_ENV['WEBHOOK_SECRET']);
 
@@ -91,10 +92,33 @@ $result = $api->createPayment(
 
 $payment = $result['payment'];
 
-echo $payment['paymentId'];     // "pay_xxxx"
-echo $payment['walletAddress']; // adresse TRX où le client doit envoyer
-echo $payment['qrCode'];        // data URI base64 — affiche avec <img src="...">
+echo $payment['paymentId'];     // "PAY-XXXX"
+echo $payment['currency'];      // "USDT"
+echo $payment['amount'];        // 25.00  (USDT à envoyer)
+echo $payment['walletAddress']; // "TXxx..."  adresse TRC-20
+echo $payment['qrCode'];        // data URI base64
 echo $payment['expiresAt'];     // ISO 8601, expiration dans 15 min
+```
+
+**BTC :**
+```php
+$result = $api->createPayment(
+    amount: 25.00,    // toujours en USD pour BTC
+    metadata: ['order_id' => '789', 'user_id' => '42'],
+    externalRef: 'order-789',
+    currency: 'BTC'
+);
+
+$payment = $result['payment'];
+
+echo $payment['paymentId'];     // "PAY-XXXX"
+echo $payment['currency'];      // "BTC"
+echo $payment['usdAmount'];     // 25.00  (USD — ce que tu as passé)
+echo $payment['amount'];        // 0.00029412  (BTC à envoyer)
+echo $payment['exchangeRate'];  // 85000  (taux USD/BTC à la création)
+echo $payment['walletAddress']; // "bc1q..."  adresse Bitcoin
+echo $payment['qrCode'];        // data URI — format BIP21 bitcoin:<address>?amount=<btc>
+echo $payment['expiresAt'];     // ISO 8601, expiration dans 60 min
 ```
 
 ### 2. Afficher la page de paiement
@@ -102,9 +126,18 @@ echo $payment['expiresAt'];     // ISO 8601, expiration dans 15 min
 ```php
 $_SESSION['pending_payment_id'] = $payment['paymentId'];
 
+$currency = $payment['currency']; // "USDT" ou "BTC"
+$amount   = $payment['amount'];   // montant dans la devise native
+
 echo '<img src="' . $payment['qrCode'] . '" width="200">';
-echo '<p>Envoyer exactement <strong>' . $payment['amount'] . ' USDT</strong> à :</p>';
+echo '<p>Envoyer exactement <strong>' . $amount . ' ' . $currency . '</strong> à :</p>';
 echo '<code>' . $payment['walletAddress'] . '</code>';
+
+// Pour BTC uniquement — rappel du montant en USD
+if ($currency === 'BTC') {
+    echo '<p>Équivalent : <strong>$' . $payment['usdAmount'] . ' USD</strong> au taux de création</p>';
+}
+
 echo '<p>Expire le : ' . $payment['expiresAt'] . '</p>';
 ```
 
@@ -160,17 +193,18 @@ echo json_encode(['received' => true]);
 
 ## Statuts du paiement
 
-| Statut | Signification |
-|---|---|
-| `pending` | En attente — affiche le QR au client |
-| `confirming` | Transaction vue sur la blockchain |
-| `confirmed` | Paiement confirmé ✅ |
-| `swept` | Fonds reçus dans le wallet central ✅ |
-| `expired` | 15 min écoulées sans paiement |
-| `cancelled` | Annulé manuellement |
-| `failed` | Erreur technique |
+| Statut | USDT | BTC | Signification |
+|---|---|---|---|
+| `pending` | ✓ | ✓ | En attente — affiche le QR au client |
+| `confirming` | — | ✓ | 1 confirmation reçue, 2 autres attendues (~20 min) |
+| `confirmed` | ✓ | ✓ | Paiement confirmé ✅ |
+| `swept` | ✓ | ✓ | Fonds reçus dans le wallet central ✅ |
+| `expired` | ✓ | ✓ | USDT: 15 min — BTC: 60 min — sans paiement reçu |
+| `cancelled` | ✓ | — | Annulé manuellement (seulement si `pending`) |
+| `failed` | ✓ | ✓ | Erreur technique |
 
-> Considère `confirmed` et `swept` comme paiement réussi. Le sweep peut prendre quelques secondes de plus.
+> Considère `confirmed` et `swept` comme paiement réussi.
+> Pour BTC, **ne pas livrer sur `confirming`** — la transaction n'est pas encore finalisée.
 
 ---
 
@@ -246,18 +280,22 @@ if (in_array($event['event'], ['payment.confirmed', 'payment.swept'])) {
     // Place ici ta logique métier (activer une commande, envoyer un email, etc.)
     // $event['metadata'] contient les données passées à la création du paiement
     // ex: $event['metadata']['order_id'], $event['metadata']['user_id']
+    //
+    // Pour BTC: $event['currency'] === 'BTC', $event['usdAmount'] = montant USD
+    // Pour les deux: $event['currency'] permet de savoir quelle devise a été utilisée
 }
 
 http_response_code(200);
 echo json_encode(['received' => true]);
 ```
 
-**Payload reçu pour `payment.confirmed` :**
+**Payload reçu pour `payment.confirmed` (USDT) :**
 
 ```json
 {
   "event": "payment.confirmed",
-  "paymentId": "pay_xxxx",
+  "paymentId": "PAY-XXXX",
+  "currency": "USDT",
   "amount": 25.00,
   "receivedAmount": 25.00,
   "txHash": "abc123...",
@@ -267,6 +305,25 @@ echo json_encode(['received' => true]);
   "confirmedAt": "2024-01-15T10:30:00.000Z"
 }
 ```
+
+**Payload reçu pour `payment.confirmed` (BTC) :**
+
+```json
+{
+  "event": "payment.confirmed",
+  "paymentId": "PAY-XXXX",
+  "currency": "BTC",
+  "amount": 0.00029412,
+  "usdAmount": 25.00,
+  "receivedAmount": 0.00029412,
+  "txHash": "def789...",
+  "walletAddress": "bc1q...",
+  "metadata": { "order_id": "789", "user_id": "42" },
+  "confirmedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+
+> Pour BTC, `senderAddress` n'est pas disponible (limitation Bitcoin).
 
 **Payload reçu pour `payment.swept` :**
 
@@ -301,7 +358,7 @@ if (!$paymentId) exit;
 
 $pdo       = new PDO($_ENV['DATABASE_URL']);
 $startTime = time();
-$timeout   = 900; // 15 min max (durée de vie d'un paiement)
+$timeout   = 3600; // 60 min max (couvre USDT 15 min et BTC 60 min)
 
 while (time() - $startTime < $timeout) {
     $stmt = $pdo->prepare('SELECT status FROM payments WHERE payment_id = ?');
@@ -370,9 +427,11 @@ Si tu n'as pas encore de table `payments` côté PHP :
 ```sql
 CREATE TABLE payments (
     id           INT AUTO_INCREMENT PRIMARY KEY,
-    payment_id   VARCHAR(64) UNIQUE NOT NULL,  -- ex: "pay_xxxx"
+    payment_id   VARCHAR(64) UNIQUE NOT NULL,  -- ex: "PAY-XXXX"
     order_id     VARCHAR(64),
-    amount       DECIMAL(10, 2),
+    currency     VARCHAR(10) DEFAULT 'USDT',   -- "USDT" ou "BTC"
+    amount       DECIMAL(20, 8),               -- 8 décimales pour BTC
+    usd_amount   DECIMAL(10, 2),               -- montant USD (utile pour BTC)
     status       VARCHAR(20) DEFAULT 'pending',
     confirmed_at DATETIME,
     created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -381,50 +440,3 @@ CREATE TABLE payments (
 
 > `payment_id` est la valeur retournée par `POST /api/payments` — c'est la clé de liaison entre les deux systèmes.
 
----
-
-## Paiements BTC
-
-### Créer un paiement BTC
-
-```php
-$result = $api->createPayment(
-    amount: 25.00,           // Toujours en USD pour BTC
-    metadata: ['order_id' => '789'],
-    externalRef: 'order-789', // optionnel
-    currency: 'BTC'
-);
-
-$payment = $result['payment'];
-
-echo $payment['currency'];      // "BTC"
-echo $payment['usdAmount'];     // 25.00  (USD — ce que tu as passé)
-echo $payment['amount'];        // 0.00029412  (BTC à envoyer)
-echo $payment['exchangeRate'];  // 85000  (taux USD/BTC au moment de la création)
-echo $payment['walletAddress']; // "bc1q..."  adresse Bitcoin
-echo $payment['qrCode'];        // data URI — format BIP21 bitcoin:<address>?amount=<btc>
-echo $payment['expiresAt'];     // ISO 8601 — expiration dans 60 min
-```
-
-### Statuts spécifiques BTC
-
-| Statut | Signification |
-|---|---|
-| `pending` | En attente — aucune transaction détectée |
-| `confirming` | 1 confirmation reçue, en attente des 2 suivantes (~20 min) |
-| `confirmed` | 3 confirmations — paiement validé ✅ |
-| `swept` | Fonds transférés au wallet central ✅ |
-| `expired` | 60 min écoulées sans transaction |
-
-> Considère `confirmed` et `swept` comme paiement réussi.
-> Le statut `confirming` est intermédiaire — **ne pas livrer encore** à ce stade.
-
-### Variables d'environnement Render à ajouter
-
-```env
-BTC_NETWORK=mainnet
-BTC_CENTRAL_WALLET_ADDRESS=bc1q...
-BTC_CENTRAL_WALLET_WIF=
-BTC_FEES_WALLET_ADDRESS=bc1q...
-BLOCKCYPHER_TOKEN=          # optionnel, augmente les rate limits
-```
