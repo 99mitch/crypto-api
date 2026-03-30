@@ -2,9 +2,16 @@ const { v4: uuidv4 } = require('uuid');
 const Payment = require('../models/Payment');
 const AuditLog = require('../models/AuditLog');
 const tronService = require('./tronService');
+const btcService = require('./btcService');
+const priceService = require('./priceService');
 const qrCodeService = require('./qrCodeService');
 const { encrypt } = require('../utils/encryption');
 const config = require('../config');
+
+const blockchainServices = {
+  USDT: tronService,
+  BTC: btcService,
+};
 
 class PaymentService {
   /**
@@ -15,36 +22,72 @@ class PaymentService {
    * @returns {object} Payment public JSON
    */
   async createPayment(amount, options = {}, req = null) {
-    // Idempotence : retourner le paiement existant si externalRef déjà utilisée
+    const currency = (options.currency || 'USDT').toUpperCase();
+
+    if (!blockchainServices[currency]) {
+      throw new Error(`Devise non supportée: ${currency}`);
+    }
+
+    // Idempotence
     if (options.externalRef) {
       const existing = await Payment.findOne({ externalRef: options.externalRef });
       if (existing) return existing.toPublicJSON();
     }
 
-    // Générer un wallet dédié
-    const wallet = await tronService.generateWallet();
+    // Conversion et paramètres par devise
+    let usdAmount, cryptoAmount, exchangeRate, requiredConfirmations, expirationMinutes;
 
-    // Chiffrer la clé privée si ENCRYPTION_KEY est configurée
-    let storedPrivateKey = wallet.privateKey;
-    if (config.encryption.masterKey) {
-      storedPrivateKey = encrypt(wallet.privateKey, config.encryption.masterKey);
+    if (currency === 'BTC') {
+      exchangeRate = await priceService.getBTCRate();
+      usdAmount = amount;
+      cryptoAmount = parseFloat((usdAmount / exchangeRate).toFixed(8));
+      requiredConfirmations = config.btc.payment.requiredConfirmations;
+      expirationMinutes = config.btc.payment.expirationMinutes;
+    } else {
+      // USDT : taux 1:1 USD
+      exchangeRate = 1;
+      usdAmount = amount;
+      cryptoAmount = amount;
+      requiredConfirmations = 1;
+      expirationMinutes = config.payment.expirationMinutes;
     }
 
-    // Générer le QR code
-    const qrCode = await qrCodeService.generatePaymentQR(wallet.address, amount);
+    // Générer le wallet dédié
+    const walletData = currency === 'BTC'
+      ? btcService.generateWallet()
+      : await tronService.generateWallet();
 
-    // Calculer l'expiration
+    const walletAddress = walletData.address;
+    const rawPrivateKey = currency === 'BTC'
+      ? walletData.privateKeyWIF
+      : walletData.privateKey;
+
+    // Chiffrer la clé privée si ENCRYPTION_KEY configurée
+    let storedPrivateKey = rawPrivateKey;
+    if (config.encryption.masterKey) {
+      storedPrivateKey = encrypt(rawPrivateKey, config.encryption.masterKey);
+    }
+
+    // QR code (BIP21 pour BTC, adresse simple pour USDT)
+    const qrCode = await qrCodeService.generatePaymentQR(walletAddress, cryptoAmount, {
+      currency,
+    });
+
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + config.payment.expirationMinutes);
+    expiresAt.setMinutes(expiresAt.getMinutes() + expirationMinutes);
 
     const payment = await Payment.create({
       paymentId: `PAY-${uuidv4().split('-')[0].toUpperCase()}`,
-      amount,
+      currency,
+      amount: cryptoAmount,
+      usdAmount,
+      exchangeRate,
+      requiredConfirmations,
       status: 'pending',
       wallet: {
-        address: wallet.address,
+        address: walletAddress,
         privateKey: storedPrivateKey,
-        base58: wallet.base58,
+        base58: walletAddress,
       },
       qrCode,
       expiresAt,
@@ -53,14 +96,16 @@ class PaymentService {
       externalRef: options.externalRef || null,
     });
 
-    // Audit log
     await AuditLog.log({
       paymentId: payment.paymentId,
       action: 'payment_created',
       req,
     });
 
-    console.log(`💳 Paiement créé: ${payment.paymentId} - ${amount} USDT → ${wallet.address}`);
+    const label = currency === 'BTC'
+      ? `${cryptoAmount} BTC (~$${usdAmount} USD)`
+      : `${amount} USDT`;
+    console.log(`💳 Paiement créé: ${payment.paymentId} - ${label} → ${walletAddress}`);
 
     return payment.toPublicJSON();
   }
