@@ -121,10 +121,10 @@ describe('btcService.sweepBTC()', () => {
     const destWallet = btcService.generateWallet();
     const feesWallet = btcService.generateWallet();
 
-    // Mock UTXOs
+    // Mock UTXOs — tx_hash must be a valid 64-char hex string (32 bytes) as returned by Blockcypher
     axios.get.mockResolvedValueOnce({
       data: {
-        txrefs: [{ tx_hash: 'utxo_hash1', tx_output_n: 0, value: 100000, spent: false }],
+        txrefs: [{ tx_hash: 'a'.repeat(64), tx_output_n: 0, value: 100000, spent: false }],
       },
     });
     // Mock fee rate
@@ -155,7 +155,7 @@ describe('btcService.sweepBTC()', () => {
 
     axios.get.mockResolvedValueOnce({
       data: {
-        txrefs: [{ tx_hash: 'utxo_hash2', tx_output_n: 0, value: 50000, spent: false }],
+        txrefs: [{ tx_hash: 'b'.repeat(64), tx_output_n: 0, value: 50000, spent: false }],
       },
     });
     axios.get.mockResolvedValueOnce({ data: { medium_fee_per_kb: 10000 } });

@@ -117,6 +117,7 @@ class BtcService {
    * @returns {Promise<{ txHash: string, feesAmount: number }>}
    */
   async sweepBTC(privateKeyWIF, fromAddress, toAddress, feesWalletAddress, feesPercentage) {
+    try {
     const tokenParams = this._tokenParams();
 
     // 1. UTXOs confirmés
@@ -164,10 +165,8 @@ class BtcService {
     const psbt = new bitcoin.Psbt({ network: this.network });
 
     for (const utxo of utxos) {
-      // tx_hash must be a 32-byte Buffer; convert hex string and zero-pad to exactly 32 bytes
-      const hashBytes = Buffer.from(utxo.tx_hash, 'hex');
-      const hashBuf = Buffer.alloc(32);
-      hashBytes.copy(hashBuf, Math.max(0, 32 - hashBytes.length));
+      // tx_hash from Blockcypher is big-endian hex; PSBT requires little-endian (internal byte order)
+      const hashBuf = Buffer.from(utxo.tx_hash, 'hex').reverse();
       psbt.addInput({
         hash: hashBuf,
         index: utxo.tx_output_n,
@@ -194,6 +193,9 @@ class BtcService {
       { params: tokenParams, timeout: 15000 }
     );
 
+    if (!broadcastResp.data?.tx?.hash) {
+      throw new Error(`Broadcast BTC échoué — réponse inattendue: ${JSON.stringify(broadcastResp.data)}`);
+    }
     const txHash = broadcastResp.data.tx.hash;
     console.log(`BTC Sweep: ${fromAddress} -> ${toAddress} (tx: ${txHash})`);
 
@@ -201,6 +203,10 @@ class BtcService {
       txHash,
       feesAmount: feesSats / 1e8,
     };
+    } catch (error) {
+      console.error(`Erreur sweepBTC pour ${fromAddress}:`, error.message);
+      throw error;
+    }
   }
 }
 
