@@ -8,7 +8,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:3000',
+      '/api': 'https://crypto-api-e2zh.onrender.com',
     },
   },
   test: {
