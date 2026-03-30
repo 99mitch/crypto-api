@@ -51,7 +51,7 @@ module.exports = {
     feesWalletAddress: process.env.BTC_FEES_WALLET_ADDRESS || null,
     payment: {
       expirationMinutes: parseInt(process.env.BTC_PAYMENT_EXPIRATION_MINUTES) || 60,
-      requiredConfirmations: parseInt(process.env.BTC_REQUIRED_CONFIRMATIONS) || 3,
+      requiredConfirmations: parseInt(process.env.BTC_REQUIRED_CONFIRMATIONS) || 1,
       amountTolerance: parseFloat(process.env.BTC_AMOUNT_TOLERANCE) || 0.015,
     },
   },
