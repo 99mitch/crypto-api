@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 
 export default function CreatePaymentModal({ onClose }) {
   const navigate = useNavigate()
+  const [currency, setCurrency] = useState('USDT')
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -21,11 +22,13 @@ export default function CreatePaymentModal({ onClose }) {
   async function handleSubmit(e) {
     e.preventDefault()
     const parsedAmount = parseFloat(amount)
-    if (isNaN(parsedAmount) || parsedAmount < 0.01) {
-      setError('Amount must be at least 0.01 USDT')
+    const minAmount = currency === 'BTC' ? 1 : 0.01
+    const minLabel = currency === 'BTC' ? '1 USD' : '0.01 USDT'
+    if (isNaN(parsedAmount) || parsedAmount < minAmount) {
+      setError(`Amount must be at least ${minLabel}`)
       return
     }
-    const payload = { amount: parsedAmount }
+    const payload = { amount: parsedAmount, currency }
     const trimmedDesc = description.trim()
     if (trimmedDesc) payload.description = trimmedDesc
 
@@ -40,6 +43,8 @@ export default function CreatePaymentModal({ onClose }) {
       setSubmitting(false)
     }
   }
+
+  const isBTC = currency === 'BTC'
 
   return (
     <div
@@ -60,15 +65,49 @@ export default function CreatePaymentModal({ onClose }) {
         </div>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          {/* Currency toggle */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Amount (USDT) *</label>
+            <label className="block text-sm text-zinc-400 mb-2">Currency</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setCurrency('USDT'); setError(null) }}
+                className={`flex-1 px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
+                  !isBTC
+                    ? 'bg-blue-600 text-white border border-blue-600'
+                    : 'bg-transparent text-zinc-400 border border-zinc-700 hover:border-zinc-500'
+                }`}
+              >
+                USDT
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCurrency('BTC'); setError(null) }}
+                className={`flex-1 px-4 py-2 text-sm rounded-lg font-medium transition-colors ${
+                  isBTC
+                    ? 'bg-blue-600 text-white border border-blue-600'
+                    : 'bg-transparent text-zinc-400 border border-zinc-700 hover:border-zinc-500'
+                }`}
+              >
+                BTC
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm text-zinc-400 mb-1">
+              {isBTC ? 'Amount (USD)' : 'Amount (USDT)'} *
+            </label>
+            {isBTC && (
+              <p className="text-xs text-zinc-500 mb-1">(converti en BTC au taux actuel)</p>
+            )}
             <input
               type="number"
               value={amount}
               onChange={e => setAmount(e.target.value)}
-              min="0.01"
-              step="0.01"
-              placeholder="0.00"
+              min={isBTC ? '1' : '0.01'}
+              step={isBTC ? '1' : '0.01'}
+              placeholder="25.00"
               className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-400"
               autoFocus
             />

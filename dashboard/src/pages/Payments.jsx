@@ -4,10 +4,11 @@ import { Plus } from 'lucide-react'
 import api from '../hooks/useApi'
 import StatusBadge from '../components/StatusBadge'
 import Pagination from '../components/Pagination'
-import { formatUSDT, formatDateTime, getDayRange } from '../utils/formatters'
+import { formatCrypto, formatDateTime, getDayRange } from '../utils/formatters'
 import CreatePaymentModal from '../components/CreatePaymentModal'
 
 const STATUS_OPTIONS = ['', 'pending', 'confirming', 'confirmed', 'expired', 'cancelled', 'swept', 'failed']
+const CURRENCY_OPTIONS = ['', 'USDT', 'BTC']
 
 export default function Payments() {
   const navigate = useNavigate()
@@ -17,13 +18,14 @@ export default function Payments() {
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [filters, setFilters] = useState({ status: '', from: '', to: '' })
+  const [filters, setFilters] = useState({ status: '', currency: '', from: '', to: '' })
   const [showCreate, setShowCreate] = useState(false)
 
   useEffect(() => {
     setLoading(true)
     const params = new URLSearchParams({ page, limit: 20 })
     if (filters.status) params.set('status', filters.status)
+    if (filters.currency) params.set('currency', filters.currency)
     if (filters.from) params.set('from', getDayRange(new Date(filters.from)).from)
     if (filters.to) params.set('to', getDayRange(new Date(filters.to)).to)
 
@@ -66,6 +68,16 @@ export default function Payments() {
           <option value="">All statuses</option>
           {STATUS_OPTIONS.filter(Boolean).map(s => (
             <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+        <select
+          value={filters.currency}
+          onChange={e => handleFilterChange('currency', e.target.value)}
+          className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 focus:outline-none focus:border-zinc-400"
+        >
+          <option value="">All currencies</option>
+          {CURRENCY_OPTIONS.filter(Boolean).map(c => (
+            <option key={c} value={c}>{c}</option>
           ))}
         </select>
         <input
@@ -114,7 +126,7 @@ export default function Payments() {
                     className="border-b border-zinc-800 hover:bg-zinc-800/50 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-zinc-300 truncate max-w-xs">{p.paymentId}</td>
-                    <td className="px-4 py-3 text-zinc-300">{formatUSDT(p.amount)}</td>
+                    <td className="px-4 py-3 text-zinc-300">{formatCrypto(p.amount, p.currency)}</td>
                     <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
                     <td className="px-4 py-3 text-zinc-400 hidden md:table-cell">{formatDateTime(p.createdAt)}</td>
                     <td className="px-4 py-3 text-zinc-400 hidden md:table-cell">{formatDateTime(p.updatedAt)}</td>

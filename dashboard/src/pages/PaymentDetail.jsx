@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import api from '../hooks/useApi'
 import StatusBadge from '../components/StatusBadge'
 import AuditTimeline from '../components/AuditTimeline'
-import { formatUSDT, formatDateTime } from '../utils/formatters'
+import { formatCrypto, formatDateTime } from '../utils/formatters'
 
 function Toast({ message, type }) {
   return (
@@ -23,6 +23,21 @@ function DetailRow({ label, value }) {
       <span className="text-zinc-500 text-sm sm:w-40 shrink-0">{label}</span>
       <span className="text-zinc-200 text-sm font-mono break-all">{String(value)}</span>
     </div>
+  )
+}
+
+function CurrencyBadge({ currency }) {
+  if (currency === 'BTC') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-600">
+        BTC
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+      USDT
+    </span>
   )
 }
 
@@ -80,6 +95,8 @@ export default function PaymentDetail() {
     return <p className="text-rose-400 text-sm">{error ?? 'Payment not found'}</p>
   }
 
+  const isBTC = payment.currency === 'BTC'
+
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
@@ -108,8 +125,25 @@ export default function PaymentDetail() {
         <div className="bg-zinc-900 rounded-xl p-5 border border-zinc-800">
           <h2 className="text-sm font-medium text-zinc-300 mb-3">Payment Details</h2>
           <div>
-            <DetailRow label="Amount" value={formatUSDT(payment.amount)} />
-            <DetailRow label="Received" value={payment.receivedAmount ? formatUSDT(payment.receivedAmount) : null} />
+            <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2.5 border-b border-zinc-800">
+              <span className="text-zinc-500 text-sm sm:w-40 shrink-0">Amount</span>
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-200 text-sm font-mono">{formatCrypto(payment.amount, payment.currency)}</span>
+                <CurrencyBadge currency={payment.currency} />
+              </div>
+            </div>
+            {payment.receivedAmount != null && (
+              <div className="flex flex-col sm:flex-row sm:items-start gap-1 py-2.5 border-b border-zinc-800">
+                <span className="text-zinc-500 text-sm sm:w-40 shrink-0">Received</span>
+                <span className="text-zinc-200 text-sm font-mono">{formatCrypto(payment.receivedAmount, payment.currency)}</span>
+              </div>
+            )}
+            {isBTC && payment.usdAmount != null && (
+              <DetailRow label="Montant USD" value={`$${Number(payment.usdAmount).toFixed(2)} USD`} />
+            )}
+            {isBTC && payment.exchangeRate != null && (
+              <DetailRow label="Taux" value={`${payment.exchangeRate.toLocaleString()} USD/BTC`} />
+            )}
             <DetailRow label="Wallet Address" value={payment.walletAddress} />
             <DetailRow label="Sender Address" value={payment.senderAddress} />
             <DetailRow label="TX Hash" value={payment.txHash} />

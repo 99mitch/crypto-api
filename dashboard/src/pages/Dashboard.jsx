@@ -6,7 +6,7 @@ import {
 import api from '../hooks/useApi'
 import StatCard from '../components/StatCard'
 import StatusBadge from '../components/StatusBadge'
-import { formatUSDT, formatRelativeTime } from '../utils/formatters'
+import { formatCrypto, formatRelativeTime } from '../utils/formatters'
 import { STATUS_COLORS } from '../constants'
 
 const STATUS_ORDER = ['swept', 'confirmed', 'confirming', 'pending', 'expired', 'cancelled', 'failed']
@@ -106,13 +106,13 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Revenue"
-          value={formatUSDT(stats?.totalRevenue ?? 0)}
+          value={`${Number(stats?.totalRevenue ?? 0).toFixed(2)} USD`}
           icon={DollarSign}
           accent
         />
         <StatCard
           title="Today's Revenue"
-          value={formatUSDT(stats?.today?.revenue ?? 0)}
+          value={`${Number(stats?.today?.revenue ?? 0).toFixed(2)} USD`}
           subtitle={`${stats?.today?.count ?? 0} payments`}
           icon={TrendingUp}
         />
@@ -141,7 +141,7 @@ export default function Dashboard() {
               <Tooltip
                 contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 8 }}
                 labelStyle={{ color: '#f4f4f5' }}
-                formatter={v => [`${v.toFixed(2)} USDT`, 'Revenue']}
+                formatter={v => [`${v.toFixed(2)} USD`, 'Revenue']}
               />
               <Bar dataKey="revenue" fill="#d4d4d8" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -188,7 +188,7 @@ export default function Dashboard() {
                   <span className="text-sm text-zinc-300 font-mono truncate">{item.paymentId}</span>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">
-                  <span className="text-sm text-zinc-400">{formatUSDT(item.amount)}</span>
+                  <span className="text-sm text-zinc-400">{formatCrypto(item.amount, item.currency)}</span>
                   <span className="text-xs text-zinc-500">{formatRelativeTime(item.updatedAt)}</span>
                 </div>
               </li>

@@ -2,6 +2,13 @@ export function formatUSDT(amount) {
   return `${Number(amount).toFixed(2)} USDT`
 }
 
+export function formatCrypto(amount, currency = 'USDT') {
+  if (currency === 'BTC') {
+    return `${Number(amount).toFixed(8).replace(/0+$/, '').replace(/\.$/, '')} BTC`
+  }
+  return formatUSDT(amount)
+}
+
 export function formatRelativeTime(date) {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
   if (seconds < 60) return 'just now'
