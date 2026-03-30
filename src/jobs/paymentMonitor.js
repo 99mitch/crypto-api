@@ -1,6 +1,7 @@
 const Payment = require('../models/Payment');
 const AuditLog = require('../models/AuditLog');
 const tronService = require('../services/tronService');
+const btcService = require('../services/btcService');
 const webhookService = require('../services/webhookService');
 const retryService = require('../services/retryService');
 const { decrypt } = require('../utils/encryption');
@@ -100,88 +101,156 @@ class PaymentMonitor {
   }
 
   /**
-   * Vérifie les paiements en attente pour détecter les réceptions USDT
+   * Vérifie les paiements en attente et les paiements BTC en cours de confirmation
    */
   async _checkPendingPayments() {
-    // Inclut les paiements dans le délai de grâce (expiresAt dépassé depuis moins de gracePeriod)
     const graceCutoff = new Date(Date.now() - config.payment.gracePeriodSeconds * 1000);
-    const pendingPayments = await Payment.find({
-      status: 'pending',
-      expiresAt: { $gt: graceCutoff },
+
+    // Inclut les paiements BTC 'confirming' (attente de confirmations supplémentaires)
+    const paymentsToCheck = await Payment.find({
+      $or: [
+        { status: 'pending', expiresAt: { $gt: graceCutoff } },
+        { status: 'confirming', currency: 'BTC' },
+      ],
     });
 
-    for (const payment of pendingPayments) {
+    for (const payment of paymentsToCheck) {
       try {
-        // Vérifier le solde USDT sur le wallet dédié
-        const balance = await tronService.getUSDTBalance(payment.wallet.address);
-
-        const minAccepted = payment.amount * (1 - config.payment.amountTolerance);
-        if (balance >= minAccepted) {
-          // Paiement reçu !
-          const isPartial = balance < payment.amount;
-          const isOverpaid = balance > payment.amount;
-          const isLate = new Date() > payment.expiresAt;
-          console.log(
-            `✅ Paiement reçu: ${payment.paymentId} - ${balance}/${payment.amount} USDT` +
-            `${isPartial ? ' (tolérance)' : ''}${isOverpaid ? ' (sur-paiement)' : ''}${isLate ? ' (tardif)' : ''}`
-          );
-
-          // Récupérer le hash de la transaction
-          const txs = await tronService.getIncomingUSDTTransactions(
-            payment.wallet.address,
-            payment.createdAt.getTime()
-          );
-
-          const matchingTx = txs.find((tx) => tx.amount >= minAccepted);
-
-          payment.status = 'confirmed';
-          // Sur-paiement : on crédite uniquement le montant demandé côté PHP
-          // Le sweep récupérera le solde réel complet
-          payment.receivedAmount = isOverpaid ? payment.amount : balance;
-          payment.txHash = matchingTx?.txHash || null;
-          payment.senderAddress = matchingTx?.from || null;
-          payment.confirmations = 1;
-          payment.sweepStatus = 'pending';
-          await payment.save();
-
-          await AuditLog.log({
-            paymentId: payment.paymentId,
-            action: 'payment_confirmed',
-            details: matchingTx?.txHash ? { txHash: matchingTx.txHash } : {},
-          });
-
-          // Envoyer le webhook avec retry intelligent
-          try {
-            await webhookService.sendConfirmation(payment);
-          } catch (webhookErr) {
-            console.error(`⚠️ Webhook initial échoué, retry planifié: ${webhookErr.message}`);
-            retryService.scheduleWebhookRetry(payment, (p) =>
-              webhookService.sendConfirmation(p)
-            );
-          }
-        } else if (balance > 0 && balance < minAccepted) {
-          // Montant partiel reçu
-          console.log(
-            `⚠️ Montant partiel: ${payment.paymentId} - ${balance}/${payment.amount} USDT`
-          );
-          payment.receivedAmount = balance;
-          await payment.save();
-
-          await AuditLog.log({
-            paymentId: payment.paymentId,
-            action: 'payment_partial_received',
-            level: 'warn',
-          });
+        if (payment.currency === 'BTC') {
+          await this._checkBTCPayment(payment);
+        } else {
+          await this._checkUSDTPayment(payment);
         }
       } catch (error) {
-        console.error(
-          `Erreur vérification ${payment.paymentId}:`,
-          error.message
+        console.error(`Erreur vérification ${payment.paymentId}:`, error.message);
+      }
+      await this._sleep(1000);
+    }
+  }
+
+  /**
+   * Vérifie un paiement USDT en attente
+   */
+  async _checkUSDTPayment(payment) {
+    // Vérifier le solde USDT sur le wallet dédié
+    const balance = await tronService.getUSDTBalance(payment.wallet.address);
+
+    const minAccepted = payment.amount * (1 - config.payment.amountTolerance);
+    if (balance >= minAccepted) {
+      // Paiement reçu !
+      const isPartial = balance < payment.amount;
+      const isOverpaid = balance > payment.amount;
+      const isLate = new Date() > payment.expiresAt;
+      console.log(
+        `✅ Paiement reçu: ${payment.paymentId} - ${balance}/${payment.amount} USDT` +
+        `${isPartial ? ' (tolérance)' : ''}${isOverpaid ? ' (sur-paiement)' : ''}${isLate ? ' (tardif)' : ''}`
+      );
+
+      // Récupérer le hash de la transaction
+      const txs = await tronService.getIncomingUSDTTransactions(
+        payment.wallet.address,
+        payment.createdAt.getTime()
+      );
+
+      const matchingTx = txs.find((tx) => tx.amount >= minAccepted);
+
+      payment.status = 'confirmed';
+      // Sur-paiement : on crédite uniquement le montant demandé côté PHP
+      // Le sweep récupérera le solde réel complet
+      payment.receivedAmount = isOverpaid ? payment.amount : balance;
+      payment.txHash = matchingTx?.txHash || null;
+      payment.senderAddress = matchingTx?.from || null;
+      payment.confirmations = 1;
+      payment.sweepStatus = 'pending';
+      await payment.save();
+
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_confirmed',
+        details: matchingTx?.txHash ? { txHash: matchingTx.txHash } : {},
+      });
+
+      // Envoyer le webhook avec retry intelligent
+      try {
+        await webhookService.sendConfirmation(payment);
+      } catch (webhookErr) {
+        console.error(`⚠️ Webhook initial échoué, retry planifié: ${webhookErr.message}`);
+        retryService.scheduleWebhookRetry(payment, (p) =>
+          webhookService.sendConfirmation(p)
         );
       }
+    } else if (balance > 0 && balance < minAccepted) {
+      // Montant partiel reçu
+      console.log(
+        `⚠️ Montant partiel: ${payment.paymentId} - ${balance}/${payment.amount} USDT`
+      );
+      payment.receivedAmount = balance;
+      await payment.save();
 
-      // Petit délai entre chaque vérification pour éviter le rate limit
-      await this._sleep(1000);
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_partial_received',
+        level: 'warn',
+      });
+    }
+  }
+
+  /**
+   * Vérifie un paiement BTC (gère pending → confirming → confirmed)
+   */
+  async _checkBTCPayment(payment) {
+    const minAccepted = payment.amount * (1 - config.btc.payment.amountTolerance);
+
+    const balance = await btcService.getBalance(payment.wallet.address);
+    if (balance < minAccepted) return;
+
+    const txs = await btcService.getIncomingTransactions(payment.wallet.address);
+    const matchingTx = txs.find(tx => tx.amount >= minAccepted);
+    if (!matchingTx) return;
+
+    const confirmations = await btcService.getTransactionConfirmations(matchingTx.txHash);
+
+    // Mettre à jour les champs communs
+    payment.confirmations = confirmations;
+    payment.txHash = payment.txHash || matchingTx.txHash;
+    payment.receivedAmount = payment.receivedAmount || balance;
+
+    if (confirmations >= payment.requiredConfirmations) {
+      // Seuil atteint — valider (depuis pending ou confirming)
+      payment.status = 'confirmed';
+      payment.sweepStatus = 'pending';
+      await payment.save();
+      console.log(
+        `✅ BTC confirmé: ${payment.paymentId} (${confirmations}/${payment.requiredConfirmations} confirmations, tx: ${matchingTx.txHash})`
+      );
+
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_confirmed',
+        details: { txHash: matchingTx.txHash, confirmations },
+      });
+
+      try {
+        await webhookService.sendConfirmation(payment);
+      } catch (webhookErr) {
+        console.error(`⚠️ Webhook BTC initial échoué, retry planifié: ${webhookErr.message}`);
+        retryService.scheduleWebhookRetry(payment, p => webhookService.sendConfirmation(p));
+      }
+    } else if (payment.status === 'pending' && confirmations >= 1) {
+      // Première confirmation — passer en confirming
+      payment.status = 'confirming';
+      await payment.save();
+      console.log(
+        `🔄 BTC confirming: ${payment.paymentId} (${confirmations}/${payment.requiredConfirmations} confirmation(s))`
+      );
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_confirming',
+        details: { txHash: matchingTx.txHash, confirmations },
+      });
+    } else if (payment.status === 'confirming') {
+      // Mise à jour du compteur uniquement
+      await payment.save();
     }
   }
 
@@ -200,7 +269,7 @@ class PaymentMonitor {
         await payment.save();
 
         console.log(
-          `💸 Sweep en cours: ${payment.paymentId} - ${payment.receivedAmount} USDT`
+          `💸 Sweep en cours: ${payment.paymentId} - ${payment.receivedAmount} ${payment.currency}`
         );
 
         await AuditLog.log({
@@ -211,67 +280,11 @@ class PaymentMonitor {
         // Déchiffrer la clé privée
         const privateKey = this._decryptPrivateKey(payment.wallet.privateKey);
 
-        // Re-fetch le solde réel pour sweeper tout (couvre le sur-paiement)
-        const actualBalance = await tronService.getUSDTBalance(payment.wallet.address);
-        const sweepTotal = Math.floor(actualBalance * 1e6) / 1e6;
-
-        const hasFees = config.fees.walletAddress && config.fees.percentage > 0;
-        const nbTransfers = hasFees ? 2 : 1;
-
-        // Envoyer le TRX pour gas (une seule fois, pour couvrir tous les transferts)
-        await tronService.ensureGasForSweep(payment.wallet.address, nbTransfers);
-
-        let feesAmount = null;
-        let feesTxHash = null;
-        let sweepTxHash;
-
-        if (hasFees) {
-          feesAmount = Math.floor(sweepTotal * config.fees.percentage * 1e6) / 1e6;
-          const netAmount = Math.floor((sweepTotal - feesAmount) * 1e6) / 1e6;
-
-          console.log(`💰 Frais: ${feesAmount} USDT (${config.fees.percentage * 100}%) → fees wallet`);
-
-          feesTxHash = await tronService.sweepUSDT(
-            privateKey,
-            payment.wallet.address,
-            feesAmount,
-            config.fees.walletAddress
-          );
-
-          await this._sleep(3000);
-
-          sweepTxHash = await tronService.sweepUSDT(
-            privateKey,
-            payment.wallet.address,
-            netAmount,
-            config.tron.centralWallet.address
-          );
+        if (payment.currency === 'BTC') {
+          await this._sweepBTCPayment(payment, privateKey);
         } else {
-          sweepTxHash = await tronService.sweepUSDT(
-            privateKey,
-            payment.wallet.address,
-            sweepTotal,
-            config.tron.centralWallet.address
-          );
+          await this._sweepUSDTPayment(payment, privateKey);
         }
-
-        payment.sweepTxHash = sweepTxHash;
-        payment.feesAmount = feesAmount;
-        payment.feesTxHash = feesTxHash;
-        payment.sweepStatus = 'completed';
-        payment.status = 'swept';
-        await payment.save();
-
-        await AuditLog.log({
-          paymentId: payment.paymentId,
-          action: 'sweep_completed',
-          details: { txHash: sweepTxHash },
-        });
-
-        console.log(`✅ Sweep terminé: ${payment.paymentId} → tx: ${sweepTxHash}`);
-
-        // Webhook sweep
-        await webhookService.sendSweepCompleted(payment);
       } catch (error) {
         console.error(`❌ Sweep échoué ${payment.paymentId}:`, error.message);
         payment.sweepStatus = 'failed';
@@ -285,13 +298,121 @@ class PaymentMonitor {
         });
 
         // Planifier un retry intelligent
-        retryService.scheduleSweepRetry(payment, (pk, addr, amt) =>
-          tronService.sweepUSDT(this._decryptPrivateKey(pk), addr, amt)
-        );
+        retryService.scheduleSweepRetry(payment, (pk, addr, amt) => {
+          const decryptedKey = this._decryptPrivateKey(pk);
+          if (payment.currency === 'BTC') {
+            return btcService.sweepBTC(
+              decryptedKey,
+              addr,
+              config.btc.centralWallet.address,
+              config.btc.feesWalletAddress,
+              config.fees.percentage
+            );
+          }
+          return tronService.sweepUSDT(decryptedKey, addr, amt);
+        });
       }
 
       await this._sleep(3000);
     }
+  }
+
+  /**
+   * Effectue le sweep d'un paiement USDT
+   */
+  async _sweepUSDTPayment(payment, privateKey) {
+    // Re-fetch le solde réel pour sweeper tout (couvre le sur-paiement)
+    const actualBalance = await tronService.getUSDTBalance(payment.wallet.address);
+    const sweepTotal = Math.floor(actualBalance * 1e6) / 1e6;
+
+    const hasFees = config.fees.walletAddress && config.fees.percentage > 0;
+    const nbTransfers = hasFees ? 2 : 1;
+
+    // Envoyer le TRX pour gas (une seule fois, pour couvrir tous les transferts)
+    await tronService.ensureGasForSweep(payment.wallet.address, nbTransfers);
+
+    let feesAmount = null;
+    let feesTxHash = null;
+    let sweepTxHash;
+
+    if (hasFees) {
+      feesAmount = Math.floor(sweepTotal * config.fees.percentage * 1e6) / 1e6;
+      const netAmount = Math.floor((sweepTotal - feesAmount) * 1e6) / 1e6;
+
+      console.log(`💰 Frais: ${feesAmount} USDT (${config.fees.percentage * 100}%) → fees wallet`);
+
+      feesTxHash = await tronService.sweepUSDT(
+        privateKey,
+        payment.wallet.address,
+        feesAmount,
+        config.fees.walletAddress
+      );
+
+      await this._sleep(3000);
+
+      sweepTxHash = await tronService.sweepUSDT(
+        privateKey,
+        payment.wallet.address,
+        netAmount,
+        config.tron.centralWallet.address
+      );
+    } else {
+      sweepTxHash = await tronService.sweepUSDT(
+        privateKey,
+        payment.wallet.address,
+        sweepTotal,
+        config.tron.centralWallet.address
+      );
+    }
+
+    payment.sweepTxHash = sweepTxHash;
+    payment.feesAmount = feesAmount;
+    payment.feesTxHash = feesTxHash;
+    payment.sweepStatus = 'completed';
+    payment.status = 'swept';
+    await payment.save();
+
+    await AuditLog.log({
+      paymentId: payment.paymentId,
+      action: 'sweep_completed',
+      details: { txHash: sweepTxHash },
+    });
+
+    console.log(`✅ Sweep USDT terminé: ${payment.paymentId} → tx: ${sweepTxHash}`);
+    await webhookService.sendSweepCompleted(payment);
+  }
+
+  /**
+   * Effectue le sweep d'un paiement BTC
+   */
+  async _sweepBTCPayment(payment, privateKeyWIF) {
+    const feesWalletAddress = config.btc.feesWalletAddress || null;
+    const feesPercentage = feesWalletAddress && config.fees.percentage > 0
+      ? config.fees.percentage
+      : 0;
+
+    const { txHash, feesAmount } = await btcService.sweepBTC(
+      privateKeyWIF,
+      payment.wallet.address,
+      config.btc.centralWallet.address,
+      feesWalletAddress,
+      feesPercentage
+    );
+
+    payment.sweepTxHash = txHash;
+    payment.feesAmount = feesAmount > 0 ? feesAmount : null;
+    payment.feesTxHash = null; // fees inclus dans la même tx BTC
+    payment.sweepStatus = 'completed';
+    payment.status = 'swept';
+    await payment.save();
+
+    await AuditLog.log({
+      paymentId: payment.paymentId,
+      action: 'sweep_completed',
+      details: { txHash },
+    });
+    console.log(`✅ Sweep BTC terminé: ${payment.paymentId} → tx: ${txHash}`);
+    await webhookService.sendSweepCompleted(payment);
   }
 
   _sleep(ms) {
