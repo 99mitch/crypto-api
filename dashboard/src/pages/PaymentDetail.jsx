@@ -84,15 +84,15 @@ export default function PaymentDetail() {
   }
 
   async function handleCancel() {
-    if (!window.confirm('Annuler ce paiement ?')) return
+    if (!window.confirm('Cancel this payment?')) return
     setCancelling(true)
     try {
       await api.post(`/payments/${id}/cancel`)
-      showToast('Paiement annulé')
+      showToast('Payment cancelled')
       const res = await api.get(`/payments/${id}`)
       setPayment(res.data.payment)
     } catch {
-      showToast('Impossible d\'annuler le paiement', 'error')
+      showToast('Failed to cancel payment', 'error')
     } finally {
       setCancelling(false)
     }
