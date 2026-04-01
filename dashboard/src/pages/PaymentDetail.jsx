@@ -132,7 +132,7 @@ export default function PaymentDetail() {
               disabled={cancelling}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-100 text-sm rounded-lg transition-colors"
             >
-              {cancelling ? 'Annulation\u2026' : 'Cancel Payment'}
+              {cancelling ? 'Cancelling\u2026' : 'Cancel Payment'}
             </button>
           )}
           {payment.sweepStatus === 'failed' && (
