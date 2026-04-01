@@ -230,14 +230,14 @@ class PaymentMonitor {
   async _checkBTCPayment(payment) {
     const minAccepted = payment.amount * (1 - config.btc.payment.amountTolerance);
 
-    const balance = await btcService.getBalance(payment.wallet.address);
+    // Un seul appel pour le solde + les transactions (réduit les appels BlockCypher)
+    const { balance, txs } = await btcService.getAddressInfo(payment.wallet.address);
     if (balance < minAccepted) return;
 
-    const txs = await btcService.getIncomingTransactions(payment.wallet.address);
     const matchingTx = txs.find(tx => tx.amount >= minAccepted);
     if (!matchingTx) return;
 
-    const confirmations = await btcService.getTransactionConfirmations(matchingTx.txHash);
+    const confirmations = matchingTx.confirmations;
 
     // Mettre à jour les champs communs
     payment.confirmations = confirmations;

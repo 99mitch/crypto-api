@@ -42,21 +42,41 @@ class BtcService {
   }
 
   /**
+   * Solde et transactions BTC en un seul appel Blockcypher
+   * @param {string} address
+   * @returns {Promise<{ balance: number, txs: Array<{ txHash, amount, confirmations, timestamp }> }>}
+   */
+  async getAddressInfo(address) {
+    try {
+      const resp = await axios.get(`${this.baseUrl}/addrs/${address}`, {
+        params: this._tokenParams(),
+        timeout: 10000,
+      });
+      const data = resp.data;
+      const txrefs = data.txrefs || [];
+      const txs = txrefs
+        .filter(tx => !tx.spent && tx.tx_output_n >= 0)
+        .map(tx => ({
+          txHash: tx.tx_hash,
+          amount: tx.value / 1e8,
+          confirmations: tx.confirmations || 0,
+          timestamp: tx.confirmed ? new Date(tx.confirmed).getTime() : Date.now(),
+        }));
+      return { balance: (data.balance || 0) / 1e8, txs };
+    } catch (error) {
+      console.error(`Erreur getBalance BTC pour ${address}:`, error.message);
+      return { balance: 0, txs: [] };
+    }
+  }
+
+  /**
    * Solde BTC confirmé via Blockcypher
    * @param {string} address
    * @returns {Promise<number>} Solde en BTC
    */
   async getBalance(address) {
-    try {
-      const resp = await axios.get(`${this.baseUrl}/addrs/${address}/balance`, {
-        params: this._tokenParams(),
-        timeout: 10000,
-      });
-      return resp.data.balance / 1e8;
-    } catch (error) {
-      console.error(`Erreur getBalance BTC pour ${address}:`, error.message);
-      return 0;
-    }
+    const { balance } = await this.getAddressInfo(address);
+    return balance;
   }
 
   /**
@@ -66,24 +86,8 @@ class BtcService {
    * @returns {Promise<Array<{ txHash, amount, confirmations, timestamp }>>}
    */
   async getIncomingTransactions(address, _sinceTimestamp) {
-    try {
-      const resp = await axios.get(`${this.baseUrl}/addrs/${address}`, {
-        params: this._tokenParams(),
-        timeout: 10000,
-      });
-      const txrefs = resp.data.txrefs || [];
-      return txrefs
-        .filter(tx => !tx.spent && tx.tx_output_n >= 0)
-        .map(tx => ({
-          txHash: tx.tx_hash,
-          amount: tx.value / 1e8,
-          confirmations: tx.confirmations || 0,
-          timestamp: tx.confirmed ? new Date(tx.confirmed).getTime() : Date.now(),
-        }));
-    } catch (error) {
-      console.error(`Erreur getIncomingTransactions BTC pour ${address}:`, error.message);
-      return [];
-    }
+    const { txs } = await this.getAddressInfo(address);
+    return txs;
   }
 
   /**
