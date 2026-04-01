@@ -9,57 +9,80 @@ const config = require('../config');
 
 class PaymentMonitor {
   constructor() {
-    this.isRunning = false;
-    this.intervalId = null;
+    this.isRunningUsdt = false;
+    this.isRunningBtc = false;
+    this.usdtIntervalId = null;
+    this.btcIntervalId = null;
   }
 
   /**
    * Démarre le monitoring
    */
   start() {
-    if (this.intervalId) return;
+    if (this.usdtIntervalId) return;
 
-    const intervalMs = config.payment.checkIntervalSeconds * 1000;
-    this.intervalId = setInterval(() => this.run(), intervalMs);
+    const usdtMs = config.payment.checkIntervalSeconds * 1000;
+    const btcMs = config.payment.btcCheckIntervalSeconds * 1000;
+
+    this.usdtIntervalId = setInterval(() => this._runUsdt(), usdtMs);
+    this.btcIntervalId = setInterval(() => this._runBtc(), btcMs);
+
     console.log(
-      `🔍 Payment monitor démarré (interval: ${config.payment.checkIntervalSeconds}s)`
+      `🔍 Payment monitor démarré (USDT: ${config.payment.checkIntervalSeconds}s, BTC: ${config.payment.btcCheckIntervalSeconds}s)`
     );
 
     // Premier run immédiat
-    this.run();
+    this._runUsdt();
+    this._runBtc();
   }
 
   /**
    * Arrête le monitoring
    */
   stop() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-      console.log('🛑 Payment monitor arrêté');
+    if (this.usdtIntervalId) {
+      clearInterval(this.usdtIntervalId);
+      this.usdtIntervalId = null;
+    }
+    if (this.btcIntervalId) {
+      clearInterval(this.btcIntervalId);
+      this.btcIntervalId = null;
+    }
+    console.log('🛑 Payment monitor arrêté');
+  }
+
+  /**
+   * Cycle USDT : expire + vérifie USDT + sweeps USDT
+   */
+  async _runUsdt() {
+    if (this.isRunningUsdt) return;
+    this.isRunningUsdt = true;
+    try {
+      await this._expirePendingPayments();
+      await this._checkPendingPayments('USDT');
+      await this._processSweeps('USDT');
+    } catch (error) {
+      console.error('❌ Erreur PaymentMonitor USDT:', error.message);
+      await AuditLog.log({ action: 'monitor_error', level: 'error', details: { error: error.message } });
+    } finally {
+      this.isRunningUsdt = false;
     }
   }
 
   /**
-   * Exécution principale du monitoring
+   * Cycle BTC : vérifie BTC + sweeps BTC
    */
-  async run() {
-    if (this.isRunning) return;
-    this.isRunning = true;
-
+  async _runBtc() {
+    if (this.isRunningBtc) return;
+    this.isRunningBtc = true;
     try {
-      await this._expirePendingPayments();
-      await this._checkPendingPayments();
-      await this._processSweeps();
+      await this._checkPendingPayments('BTC');
+      await this._processSweeps('BTC');
     } catch (error) {
-      console.error('❌ Erreur PaymentMonitor:', error.message);
-      await AuditLog.log({
-        action: 'monitor_error',
-        level: 'error',
-        details: { error: error.message },
-      });
+      console.error('❌ Erreur PaymentMonitor BTC:', error.message);
+      await AuditLog.log({ action: 'monitor_error', level: 'error', details: { error: error.message } });
     } finally {
-      this.isRunning = false;
+      this.isRunningBtc = false;
     }
   }
 
@@ -121,27 +144,30 @@ class PaymentMonitor {
 
   /**
    * Vérifie les paiements en attente et les paiements BTC en cours de confirmation
+   * @param {'BTC'|'USDT'} currency
    */
-  async _checkPendingPayments() {
+  async _checkPendingPayments(currency) {
     const graceCutoff = new Date(Date.now() - config.payment.gracePeriodSeconds * 1000);
 
     const confirmingCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // Inclut les paiements BTC 'confirming' (attente de confirmations supplémentaires)
-    // Les paiements confirming de plus de 24h sont ignorés (tx probablement droppée du mempool)
-    const paymentsToCheck = await Payment.find({
-      $or: [
-        { status: 'pending', expiresAt: { $gt: graceCutoff } },
-        {
-          status: 'confirming',
-          currency: 'BTC',
-          $or: [
-            { confirmingAt: { $exists: false } },
-            { confirmingAt: { $gt: confirmingCutoff } },
-          ],
-        },
-      ],
-    });
+    const paymentsToCheck = await Payment.find(
+      currency === 'BTC'
+        ? {
+            $or: [
+              { status: 'pending', currency: 'BTC', expiresAt: { $gt: graceCutoff } },
+              {
+                status: 'confirming',
+                currency: 'BTC',
+                $or: [
+                  { confirmingAt: { $exists: false } },
+                  { confirmingAt: { $gt: confirmingCutoff } },
+                ],
+              },
+            ],
+          }
+        : { status: 'pending', currency: { $ne: 'BTC' }, expiresAt: { $gt: graceCutoff } }
+    );
 
     for (const payment of paymentsToCheck) {
       try {
@@ -286,11 +312,13 @@ class PaymentMonitor {
 
   /**
    * Traite les sweeps en attente
+   * @param {'BTC'|'USDT'} currency
    */
-  async _processSweeps() {
+  async _processSweeps(currency) {
     const toSweep = await Payment.find({
       status: 'confirmed',
       sweepStatus: 'pending',
+      currency: currency === 'BTC' ? 'BTC' : { $ne: 'BTC' },
     });
 
     for (const payment of toSweep) {
