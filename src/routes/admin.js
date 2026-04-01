@@ -33,6 +33,9 @@ router.get('/payments/:paymentId/history', adminController.getPaymentHistory);
 // Relancer un sweep
 router.post('/payments/:paymentId/retry-sweep', adminController.retrySweep);
 
+// Annuler un paiement
+router.post('/payments/:paymentId/cancel', adminController.cancelPayment);
+
 // Activité récente
 router.get('/recent-activity', adminController.recentActivity);
 
