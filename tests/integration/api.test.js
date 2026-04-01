@@ -316,7 +316,7 @@ describe('GET /api/health', () => {
 });
 
 describe('POST /api/admin/payments/:paymentId/cancel', () => {
-  it('cancels a pending payment', async () => {
+  it('annule un paiement en attente', async () => {
     const createRes = await request
       .post('/api/payments')
       .send({ amount: 10, currency: 'USDT' })
@@ -331,7 +331,7 @@ describe('POST /api/admin/payments/:paymentId/cancel', () => {
     expect(res.body.payment.status).toBe('cancelled')
   })
 
-  it('returns 400 when payment is not pending', async () => {
+  it('retourne 400 si le paiement n\'est pas en attente', async () => {
     const createRes = await request
       .post('/api/payments')
       .send({ amount: 10, currency: 'USDT' })
@@ -350,7 +350,7 @@ describe('POST /api/admin/payments/:paymentId/cancel', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 404 for unknown paymentId', async () => {
+  it('retourne 404 pour un paymentId inconnu', async () => {
     const res = await request
       .post('/api/admin/payments/PAY-UNKNOWN/cancel')
       .set(adminHeaders)
@@ -358,7 +358,7 @@ describe('POST /api/admin/payments/:paymentId/cancel', () => {
     expect(res.status).toBe(404)
   })
 
-  it('returns 401 without auth', async () => {
+  it('retourne 401 sans authentification', async () => {
     const createRes = await request
       .post('/api/payments')
       .send({ amount: 10, currency: 'USDT' })
