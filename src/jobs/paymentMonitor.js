@@ -18,8 +18,10 @@ class PaymentMonitor {
   /**
    * Démarre le monitoring
    */
-  start() {
+  async start() {
     if (this.usdtIntervalId) return;
+
+    await this._recoverFailedSweeps();
 
     const usdtMs = config.payment.checkIntervalSeconds * 1000;
     const btcMs = config.payment.btcCheckIntervalSeconds * 1000;
@@ -34,6 +36,26 @@ class PaymentMonitor {
     // Premier run immédiat
     this._runUsdt();
     this._runBtc();
+  }
+
+  /**
+   * Au démarrage, remet les sweeps échoués en 'pending' pour qu'ils soient retraités.
+   * Couvre les crashes et redéploiements où les timers en mémoire sont perdus.
+   */
+  async _recoverFailedSweeps() {
+    const failed = await Payment.find({ status: 'confirmed', sweepStatus: 'failed' });
+    if (failed.length === 0) return;
+
+    await Payment.updateMany(
+      { _id: { $in: failed.map(p => p._id) } },
+      { sweepStatus: 'pending' }
+    );
+
+    await AuditLog.logMany(
+      failed.map(p => ({ paymentId: p.paymentId, action: 'sweep_recovery_on_startup' }))
+    );
+
+    console.log(`🔁 ${failed.length} sweep(s) échoué(s) remis en attente au démarrage`);
   }
 
   /**

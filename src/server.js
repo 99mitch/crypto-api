@@ -68,7 +68,7 @@ async function start() {
     `);
   });
 
-  paymentMonitor.start();
+  await paymentMonitor.start();
 }
 
 start().catch((err) => {
