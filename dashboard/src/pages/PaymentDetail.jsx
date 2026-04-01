@@ -49,6 +49,7 @@ export default function PaymentDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [retrying, setRetrying] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const [toast, setToast] = useState(null)
 
   function showToast(message, type = 'success') {
@@ -82,6 +83,21 @@ export default function PaymentDetail() {
     }
   }
 
+  async function handleCancel() {
+    if (!window.confirm('Annuler ce paiement ?')) return
+    setCancelling(true)
+    try {
+      await api.post(`/payments/${id}/cancel`)
+      showToast('Paiement annulé')
+      const res = await api.get(`/payments/${id}`)
+      setPayment(res.data.payment)
+    } catch {
+      showToast('Impossible d\'annuler le paiement', 'error')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -109,15 +125,26 @@ export default function PaymentDetail() {
         </button>
         <h1 className="text-lg font-semibold text-zinc-100 font-mono">{payment.paymentId}</h1>
         <StatusBadge status={payment.status} />
-        {payment.sweepStatus === 'failed' && (
-          <button
-            onClick={handleRetrySweep}
-            disabled={retrying}
-            className="ml-auto px-4 py-2 bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-rose-100 text-sm rounded-lg transition-colors"
-          >
-            {retrying ? 'Retrying\u2026' : 'Retry Sweep'}
-          </button>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {payment.status === 'pending' && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-100 text-sm rounded-lg transition-colors"
+            >
+              {cancelling ? 'Annulation\u2026' : 'Cancel Payment'}
+            </button>
+          )}
+          {payment.sweepStatus === 'failed' && (
+            <button
+              onClick={handleRetrySweep}
+              disabled={retrying}
+              className="px-4 py-2 bg-rose-800 hover:bg-rose-700 disabled:opacity-50 text-rose-100 text-sm rounded-lg transition-colors"
+            >
+              {retrying ? 'Retrying\u2026' : 'Retry Sweep'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
