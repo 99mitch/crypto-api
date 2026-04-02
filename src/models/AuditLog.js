@@ -19,6 +19,7 @@ const auditLogSchema = new mongoose.Schema(
         'payment_created',
         'payment_expired',
         'payment_confirmed',
+        'payment_confirming',
         'payment_cancelled',
         'payment_partial_received',
 
@@ -51,6 +52,7 @@ const auditLogSchema = new mongoose.Schema(
         'monitor_error',
         'api_error',
         'rate_limit_hit',
+        'sweep_recovery_on_startup',
       ],
     },
 

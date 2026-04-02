@@ -332,7 +332,8 @@ class BtcService {
       return { txHash, feesAmount: feesSats / 1e8 };
 
     } catch (error) {
-      console.error(`Erreur sweepBTC pour ${fromAddress}:`, error.message);
+      const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+      console.error(`Erreur sweepBTC pour ${fromAddress}:`, detail);
       throw error;
     }
   }
