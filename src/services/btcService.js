@@ -256,21 +256,31 @@ class BtcService {
       }
       const feePerKb = this._feeCache;
 
-      // 3. Taille estimée de la tx (vbytes)
+      // 3. Montants en satoshis
+      const totalSats = utxos.reduce((sum, u) => sum + u.value, 0);
+      let feesSats = (feesPercentage > 0 && feesWalletAddress)
+        ? Math.floor(totalSats * feesPercentage)
+        : 0;
+
+      // Dust limit Bitcoin : un output < 546 sats est rejeté par le réseau
+      const DUST_LIMIT = 546;
+      if (feesSats > 0 && feesSats < DUST_LIMIT) {
+        console.warn(`⚠️ Frais de service ${feesSats} sats < dust limit — ajustés à ${DUST_LIMIT} sats`);
+        feesSats = DUST_LIMIT;
+      }
+
+      // 4. Taille estimée de la tx (vbytes)
       // P2WPKH : ~68 vbytes/input, ~31 vbytes/output, 11 vbytes overhead
-      const withFees = feesPercentage > 0 && feesWalletAddress;
-      const numOutputs = withFees ? 2 : 1;
+      const withFeesOutput = feesSats >= DUST_LIMIT;
+      const numOutputs = withFeesOutput ? 2 : 1;
       const estimatedVbytes = 11 + utxos.length * 68 + numOutputs * 31;
       const networkFeesSats = Math.ceil((estimatedVbytes / 1000) * feePerKb);
 
-      // 4. Montants en satoshis
-      const totalSats = utxos.reduce((sum, u) => sum + u.value, 0);
-      const feesSats = withFees ? Math.floor(totalSats * feesPercentage) : 0;
       const netSats = totalSats - feesSats - networkFeesSats;
 
-      if (netSats <= 546) {
+      if (netSats <= DUST_LIMIT) {
         throw new Error(
-          `Solde insuffisant pour couvrir les frais réseau (net: ${netSats} sats, minimum: 546 sats)`
+          `Solde insuffisant pour couvrir les frais réseau (net: ${netSats} sats, minimum: ${DUST_LIMIT} sats)`
         );
       }
 
@@ -296,7 +306,7 @@ class BtcService {
         });
       }
 
-      if (feesSats > 0) {
+      if (withFeesOutput) {
         psbt.addOutput({ address: feesWalletAddress, value: BigInt(feesSats) });
       }
       psbt.addOutput({ address: toAddress, value: BigInt(netSats) });
