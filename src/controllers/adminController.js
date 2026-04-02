@@ -226,6 +226,70 @@ class AdminController {
       return res.status(500).json({ error: 'Erreur interne' });
     }
   }
+
+  /**
+   * POST /api/admin/payments/:paymentId/refund
+   * Rembourse un paiement en renvoyant les fonds à l'expéditeur original
+   */
+  async refundPayment(req, res) {
+    const tronService = require('../services/tronService');
+    const { decrypt } = require('../utils/encryption');
+    const config = require('../config');
+
+    try {
+      const payment = await Payment.findOne({ paymentId: req.params.paymentId });
+
+      if (!payment) {
+        return res.status(404).json({ error: 'Paiement non trouvé' });
+      }
+
+      if (!['confirmed', 'swept'].includes(payment.status)) {
+        return res.status(400).json({ error: 'Payment cannot be refunded: invalid status' });
+      }
+
+      if (payment.status === 'refunded') {
+        return res.status(400).json({ error: 'Payment already refunded' });
+      }
+
+      if (!payment.senderAddress) {
+        return res.status(400).json({ error: 'sender address not found for this payment' });
+      }
+
+      // Decrypt private key if encrypted
+      const rawKey = payment.wallet.privateKey;
+      const privateKey = config.encryption.masterKey && rawKey.includes(':')
+        ? decrypt(rawKey, config.encryption.masterKey)
+        : rawKey;
+
+      const amount = payment.receivedAmount || payment.amount;
+
+      // Ensure gas then sweep back to sender
+      await tronService.ensureGasForSweep(payment.wallet.address);
+      const txHash = await tronService.sweepUSDT(
+        privateKey,
+        payment.wallet.address,
+        amount,
+        payment.senderAddress
+      );
+
+      payment.status = 'refunded';
+      payment.refundTxHash = txHash;
+      payment.refundedAt = new Date();
+      await payment.save();
+
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_refunded',
+        req,
+        details: { txHash, amount, to: payment.senderAddress },
+      });
+
+      return res.json({ success: true, txHash });
+    } catch (error) {
+      console.error('Erreur refundPayment:', error);
+      return res.status(500).json({ error: 'Erreur interne' });
+    }
+  }
 }
 
 module.exports = new AdminController();
