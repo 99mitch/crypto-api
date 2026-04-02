@@ -30,7 +30,7 @@ const paymentSchema = new mongoose.Schema(
     // Statut du paiement
     status: {
       type: String,
-      enum: ['pending', 'confirming', 'confirmed', 'expired', 'cancelled', 'swept', 'failed'],
+      enum: ['pending', 'confirming', 'confirmed', 'expired', 'cancelled', 'swept', 'failed', 'refunded'],
       default: 'pending',
       index: true,
     },
@@ -61,6 +61,10 @@ const paymentSchema = new mongoose.Schema(
       default: null,
     },
     sweepRetryCount: { type: Number, default: 0 },
+
+    // Refund info
+    refundTxHash: { type: String, default: null },
+    refundedAt: { type: Date, default: null },
 
     // Timestamp du passage en statut 'confirming' (BTC uniquement)
     confirmingAt: {
@@ -162,6 +166,8 @@ paymentSchema.methods.toAdminJSON = function () {
     feesTxHash: this.feesTxHash,
     webhookSentAt: this.webhookSentAt,
     webhookAttempts: this.webhookAttempts,
+    refundTxHash: this.refundTxHash,
+    refundedAt: this.refundedAt,
   };
 };
 
