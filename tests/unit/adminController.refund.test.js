@@ -153,4 +153,5 @@ test('refundPayment returns 400 if already refunded', async () => {
   const res = makeRes();
   await adminController.refundPayment(req, res);
   expect(res.status).toHaveBeenCalledWith(400);
+  expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Payment already refunded' }));
 });

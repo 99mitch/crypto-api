@@ -243,12 +243,12 @@ class AdminController {
         return res.status(404).json({ error: 'Paiement non trouvé' });
       }
 
-      if (!['confirmed', 'swept'].includes(payment.status)) {
-        return res.status(400).json({ error: 'Payment cannot be refunded: invalid status' });
-      }
-
       if (payment.status === 'refunded') {
         return res.status(400).json({ error: 'Payment already refunded' });
+      }
+
+      if (!['confirmed', 'swept'].includes(payment.status)) {
+        return res.status(400).json({ error: 'Payment cannot be refunded: invalid status' });
       }
 
       if (!payment.senderAddress) {
