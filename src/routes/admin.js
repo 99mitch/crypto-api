@@ -36,6 +36,9 @@ router.post('/payments/:paymentId/retry-sweep', adminController.retrySweep);
 // Annuler un paiement
 router.post('/payments/:paymentId/cancel', adminController.cancelPayment);
 
+// Rembourser un paiement
+router.post('/payments/:paymentId/refund', adminController.refundPayment);
+
 // Activité récente
 router.get('/recent-activity', adminController.recentActivity);
 

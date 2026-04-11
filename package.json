@@ -15,11 +15,13 @@
     "build": "cd dashboard && npm install && npm run build"
   },
   "dependencies": {
+    "@solana/web3.js": "^1.98.4",
     "axios": "^1.7.7",
     "bitcoinjs-lib": "^7.0.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "ecpair": "^3.0.1",
+    "ethers": "^6.16.0",
     "express": "^4.21.0",
     "helmet": "^7.1.0",
     "mongoose": "^8.6.0",

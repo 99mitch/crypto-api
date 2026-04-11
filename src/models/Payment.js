@@ -16,12 +16,13 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: function (value) {
-          // USDT min 0.01, BTC min 0.00001
-          const minAmount = this.currency === 'BTC' ? 0.00001 : 0.01;
+          const minAmounts = { BTC: 0.00001, ETH: 0.0001, SOL: 0.001, USDT: 0.01 };
+          const minAmount = minAmounts[this.currency] || 0.01;
           return value >= minAmount;
         },
         message: function (props) {
-          const minAmount = this.currency === 'BTC' ? 0.00001 : 0.01;
+          const minAmounts = { BTC: 0.00001, ETH: 0.0001, SOL: 0.001, USDT: 0.01 };
+          const minAmount = minAmounts[this.currency] || 0.01;
           return `amount must be at least ${minAmount}`;
         },
       },
@@ -30,7 +31,7 @@ const paymentSchema = new mongoose.Schema(
     // Statut du paiement
     status: {
       type: String,
-      enum: ['pending', 'confirming', 'confirmed', 'expired', 'cancelled', 'swept', 'failed'],
+      enum: ['pending', 'confirming', 'confirmed', 'expired', 'cancelled', 'swept', 'failed', 'refunded'],
       default: 'pending',
       index: true,
     },
@@ -62,6 +63,10 @@ const paymentSchema = new mongoose.Schema(
     },
     sweepRetryCount: { type: Number, default: 0 },
 
+    // Refund info
+    refundTxHash: { type: String, default: null },
+    refundedAt: { type: Date, default: null },
+
     // Timestamp du passage en statut 'confirming' (BTC uniquement)
     confirmingAt: {
       type: Date,
@@ -90,7 +95,7 @@ const paymentSchema = new mongoose.Schema(
     // Devise du paiement
     currency: {
       type: String,
-      enum: ['USDT', 'BTC'],
+      enum: ['USDT', 'BTC', 'ETH', 'SOL'],
       default: 'USDT',
       index: true,
     },
@@ -162,6 +167,8 @@ paymentSchema.methods.toAdminJSON = function () {
     feesTxHash: this.feesTxHash,
     webhookSentAt: this.webhookSentAt,
     webhookAttempts: this.webhookAttempts,
+    refundTxHash: this.refundTxHash,
+    refundedAt: this.refundedAt,
   };
 };
 

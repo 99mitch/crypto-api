@@ -12,10 +12,13 @@ class WebhookService {
     const payload = {
       event: 'payment.confirmed',
       paymentId: payment.paymentId,
+      currency: payment.currency,
       amount: payment.amount,
+      usdAmount: payment.usdAmount,
+      exchangeRate: payment.exchangeRate ?? null,
       receivedAmount: payment.receivedAmount,
       txHash: payment.txHash,
-      senderAddress: payment.senderAddress,
+      senderAddress: payment.senderAddress ?? null,
       walletAddress: payment.wallet.address,
       metadata: payment.metadata,
       confirmedAt: new Date().toISOString(),
@@ -63,7 +66,9 @@ class WebhookService {
     const payload = {
       event: 'payment.swept',
       paymentId: payment.paymentId,
+      currency: payment.currency,
       amount: payment.receivedAmount,
+      usdAmount: payment.usdAmount,
       sweepTxHash: payment.sweepTxHash,
       sweptAt: new Date().toISOString(),
     };
