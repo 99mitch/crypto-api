@@ -56,6 +56,33 @@ module.exports = {
     },
   },
 
+  eth: {
+    rpcUrl: process.env.ETH_RPC_URL || 'https://cloudflare-eth.com',
+    etherscanApiKey: process.env.ETHERSCAN_API_KEY || '',
+    centralWallet: {
+      address: process.env.ETH_CENTRAL_WALLET_ADDRESS,
+    },
+    feesWalletAddress: process.env.ETH_FEES_WALLET_ADDRESS || null,
+    payment: {
+      expirationMinutes: parseInt(process.env.ETH_PAYMENT_EXPIRATION_MINUTES) || 60,
+      requiredConfirmations: parseInt(process.env.ETH_REQUIRED_CONFIRMATIONS) || 12,
+      amountTolerance: parseFloat(process.env.ETH_AMOUNT_TOLERANCE) || 0.015,
+    },
+  },
+
+  solana: {
+    rpcUrl: process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com',
+    centralWallet: {
+      address: process.env.SOLANA_CENTRAL_WALLET_ADDRESS,
+    },
+    feesWalletAddress: process.env.SOLANA_FEES_WALLET_ADDRESS || null,
+    payment: {
+      expirationMinutes: parseInt(process.env.SOLANA_PAYMENT_EXPIRATION_MINUTES) || 30,
+      requiredConfirmations: parseInt(process.env.SOLANA_REQUIRED_CONFIRMATIONS) || 1,
+      amountTolerance: parseFloat(process.env.SOLANA_AMOUNT_TOLERANCE) || 0.015,
+    },
+  },
+
   admin: {
     apiKey: process.env.ADMIN_API_KEY,
     password: process.env.ADMIN_PASSWORD || 'changeme',

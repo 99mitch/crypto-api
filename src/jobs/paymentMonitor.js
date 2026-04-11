@@ -2,6 +2,8 @@ const Payment = require('../models/Payment');
 const AuditLog = require('../models/AuditLog');
 const tronService = require('../services/tronService');
 const btcService = require('../services/btcService');
+const ethService = require('../services/ethService');
+const solanaService = require('../services/solanaService');
 const webhookService = require('../services/webhookService');
 const retryService = require('../services/retryService');
 const { decrypt } = require('../utils/encryption');
@@ -99,18 +101,18 @@ class PaymentMonitor {
       console.log(`⏰ ${expiredPayments.length} paiement(s) expiré(s)`);
     }
 
-    // Expirer les paiements BTC bloqués en 'confirming' depuis plus de 24h
+    // Expirer les paiements bloqués en 'confirming' depuis plus de 24h (BTC, ETH, SOL)
     const confirmingCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const stalledConfirming = await Payment.find({
       status: 'confirming',
-      currency: 'BTC',
+      currency: { $in: ['BTC', 'ETH', 'SOL'] },
       confirmingAt: { $lt: confirmingCutoff },
     });
 
     for (const payment of stalledConfirming) {
       payment.status = 'expired';
       await payment.save();
-      console.log(`⏰ BTC paiement confirming expiré (>24h): ${payment.paymentId}`);
+      console.log(`⏰ ${payment.currency} paiement confirming expiré (>24h): ${payment.paymentId}`);
       await AuditLog.log({
         paymentId: payment.paymentId,
         action: 'payment_expired',
@@ -127,14 +129,14 @@ class PaymentMonitor {
 
     const confirmingCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // Inclut les paiements BTC 'confirming' (attente de confirmations supplémentaires)
-    // Les paiements confirming de plus de 24h sont ignorés (tx probablement droppée du mempool)
+    // Inclut les paiements 'confirming' (BTC, ETH, SOL) en attente de confirmations
+    // Les paiements confirming de plus de 24h sont ignorés (tx probablement droppée)
     const paymentsToCheck = await Payment.find({
       $or: [
         { status: 'pending', expiresAt: { $gt: graceCutoff } },
         {
           status: 'confirming',
-          currency: 'BTC',
+          currency: { $in: ['BTC', 'ETH', 'SOL'] },
           $or: [
             { confirmingAt: { $exists: false } },
             { confirmingAt: { $gt: confirmingCutoff } },
@@ -147,6 +149,10 @@ class PaymentMonitor {
       try {
         if (payment.currency === 'BTC') {
           await this._checkBTCPayment(payment);
+        } else if (payment.currency === 'ETH') {
+          await this._checkETHPayment(payment);
+        } else if (payment.currency === 'SOL') {
+          await this._checkSOLPayment(payment);
         } else {
           await this._checkUSDTPayment(payment);
         }
@@ -285,6 +291,118 @@ class PaymentMonitor {
   }
 
   /**
+   * Vérifie un paiement ETH (gère pending → confirming → confirmed)
+   */
+  async _checkETHPayment(payment) {
+    const minAccepted = payment.amount * (1 - config.eth.payment.amountTolerance);
+
+    const balance = await ethService.getBalance(payment.wallet.address);
+    if (balance < minAccepted) return;
+
+    const txs = await ethService.getIncomingTransactions(payment.wallet.address);
+    const matchingTx = txs.find(tx => tx.amount >= minAccepted);
+    if (!matchingTx) return;
+
+    const confirmations = await ethService.getTransactionConfirmations(matchingTx.txHash);
+
+    payment.confirmations = confirmations;
+    payment.txHash = payment.txHash || matchingTx.txHash;
+    payment.receivedAmount = payment.receivedAmount || balance;
+
+    if (confirmations >= payment.requiredConfirmations) {
+      payment.status = 'confirmed';
+      payment.sweepStatus = 'pending';
+      await payment.save();
+      console.log(
+        `✅ ETH confirmé: ${payment.paymentId} (${confirmations}/${payment.requiredConfirmations} confirmations, tx: ${matchingTx.txHash})`
+      );
+
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_confirmed',
+        details: { txHash: matchingTx.txHash, confirmations },
+      });
+
+      try {
+        await webhookService.sendConfirmation(payment);
+      } catch (webhookErr) {
+        console.error(`⚠️ Webhook ETH initial échoué, retry planifié: ${webhookErr.message}`);
+        retryService.scheduleWebhookRetry(payment, p => webhookService.sendConfirmation(p));
+      }
+    } else if (payment.status === 'pending' && confirmations >= 1) {
+      payment.status = 'confirming';
+      payment.confirmingAt = new Date();
+      await payment.save();
+      console.log(
+        `🔄 ETH confirming: ${payment.paymentId} (${confirmations}/${payment.requiredConfirmations} confirmation(s))`
+      );
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_confirming',
+        details: { txHash: matchingTx.txHash, confirmations },
+      });
+    } else if (payment.status === 'confirming') {
+      await payment.save();
+    }
+  }
+
+  /**
+   * Vérifie un paiement SOL en attente
+   */
+  async _checkSOLPayment(payment) {
+    const minAccepted = payment.amount * (1 - config.solana.payment.amountTolerance);
+
+    const balance = await solanaService.getBalance(payment.wallet.address);
+    if (balance < minAccepted) return;
+
+    const txs = await solanaService.getIncomingTransactions(
+      payment.wallet.address,
+      payment.createdAt.getTime()
+    );
+    const matchingTx = txs.find(tx => tx.amount >= minAccepted);
+    if (!matchingTx) return;
+
+    const confirmations = await solanaService.getTransactionConfirmations(matchingTx.txHash);
+
+    payment.confirmations = confirmations;
+    payment.txHash = payment.txHash || matchingTx.txHash;
+    payment.receivedAmount = payment.receivedAmount || balance;
+
+    if (confirmations >= payment.requiredConfirmations) {
+      payment.status = 'confirmed';
+      payment.sweepStatus = 'pending';
+      await payment.save();
+      console.log(
+        `✅ SOL confirmé: ${payment.paymentId} (tx: ${matchingTx.txHash})`
+      );
+
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_confirmed',
+        details: { txHash: matchingTx.txHash, confirmations },
+      });
+
+      try {
+        await webhookService.sendConfirmation(payment);
+      } catch (webhookErr) {
+        console.error(`⚠️ Webhook SOL initial échoué, retry planifié: ${webhookErr.message}`);
+        retryService.scheduleWebhookRetry(payment, p => webhookService.sendConfirmation(p));
+      }
+    } else if (payment.status === 'pending' && confirmations >= 1) {
+      payment.status = 'confirming';
+      payment.confirmingAt = new Date();
+      await payment.save();
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_confirming',
+        details: { txHash: matchingTx.txHash, confirmations },
+      });
+    } else if (payment.status === 'confirming') {
+      await payment.save();
+    }
+  }
+
+  /**
    * Traite les sweeps en attente
    */
   async _processSweeps() {
@@ -312,6 +430,10 @@ class PaymentMonitor {
 
         if (payment.currency === 'BTC') {
           await this._sweepBTCPayment(payment, privateKey);
+        } else if (payment.currency === 'ETH') {
+          await this._sweepETHPayment(payment, privateKey);
+        } else if (payment.currency === 'SOL') {
+          await this._sweepSOLPayment(payment, privateKey);
         } else {
           await this._sweepUSDTPayment(payment, privateKey);
         }
@@ -336,6 +458,26 @@ class PaymentMonitor {
               addr,
               config.btc.centralWallet.address,
               config.btc.feesWalletAddress,
+              config.fees.percentage
+            );
+            return txHash;
+          }
+          if (payment.currency === 'ETH') {
+            const { txHash } = await ethService.sweepETH(
+              decryptedKey,
+              addr,
+              config.eth.centralWallet.address,
+              config.eth.feesWalletAddress,
+              config.fees.percentage
+            );
+            return txHash;
+          }
+          if (payment.currency === 'SOL') {
+            const { txHash } = await solanaService.sweepSOL(
+              decryptedKey,
+              addr,
+              config.solana.centralWallet.address,
+              config.solana.feesWalletAddress,
               config.fees.percentage
             );
             return txHash;
@@ -443,6 +585,72 @@ class PaymentMonitor {
       details: { txHash },
     });
     console.log(`✅ Sweep BTC terminé: ${payment.paymentId} → tx: ${txHash}`);
+    await webhookService.sendSweepCompleted(payment);
+  }
+
+  /**
+   * Effectue le sweep d'un paiement ETH
+   */
+  async _sweepETHPayment(payment, privateKey) {
+    const feesWalletAddress = config.eth.feesWalletAddress || null;
+    const feesPercentage = feesWalletAddress && config.fees.percentage > 0
+      ? config.fees.percentage
+      : 0;
+
+    const { txHash, feesAmount } = await ethService.sweepETH(
+      privateKey,
+      payment.wallet.address,
+      config.eth.centralWallet.address,
+      feesWalletAddress,
+      feesPercentage
+    );
+
+    payment.sweepTxHash = txHash;
+    payment.feesAmount = feesAmount > 0 ? feesAmount : null;
+    payment.feesTxHash = null; // fees dans une tx séparée mais on trace le txHash principal
+    payment.sweepStatus = 'completed';
+    payment.status = 'swept';
+    await payment.save();
+
+    await AuditLog.log({
+      paymentId: payment.paymentId,
+      action: 'sweep_completed',
+      details: { txHash },
+    });
+    console.log(`✅ Sweep ETH terminé: ${payment.paymentId} → tx: ${txHash}`);
+    await webhookService.sendSweepCompleted(payment);
+  }
+
+  /**
+   * Effectue le sweep d'un paiement SOL
+   */
+  async _sweepSOLPayment(payment, privateKey) {
+    const feesWalletAddress = config.solana.feesWalletAddress || null;
+    const feesPercentage = feesWalletAddress && config.fees.percentage > 0
+      ? config.fees.percentage
+      : 0;
+
+    const { txHash, feesAmount } = await solanaService.sweepSOL(
+      privateKey,
+      payment.wallet.address,
+      config.solana.centralWallet.address,
+      feesWalletAddress,
+      feesPercentage
+    );
+
+    payment.sweepTxHash = txHash;
+    payment.feesAmount = feesAmount > 0 ? feesAmount : null;
+    payment.feesTxHash = null;
+    payment.sweepStatus = 'completed';
+    payment.status = 'swept';
+    await payment.save();
+
+    await AuditLog.log({
+      paymentId: payment.paymentId,
+      action: 'sweep_completed',
+      details: { txHash },
+    });
+    console.log(`✅ Sweep SOL terminé: ${payment.paymentId} → tx: ${txHash}`);
     await webhookService.sendSweepCompleted(payment);
   }
 

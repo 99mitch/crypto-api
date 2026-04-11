@@ -16,12 +16,13 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: function (value) {
-          // USDT min 0.01, BTC min 0.00001
-          const minAmount = this.currency === 'BTC' ? 0.00001 : 0.01;
+          const minAmounts = { BTC: 0.00001, ETH: 0.0001, SOL: 0.001, USDT: 0.01 };
+          const minAmount = minAmounts[this.currency] || 0.01;
           return value >= minAmount;
         },
         message: function (props) {
-          const minAmount = this.currency === 'BTC' ? 0.00001 : 0.01;
+          const minAmounts = { BTC: 0.00001, ETH: 0.0001, SOL: 0.001, USDT: 0.01 };
+          const minAmount = minAmounts[this.currency] || 0.01;
           return `amount must be at least ${minAmount}`;
         },
       },
@@ -94,7 +95,7 @@ const paymentSchema = new mongoose.Schema(
     // Devise du paiement
     currency: {
       type: String,
-      enum: ['USDT', 'BTC'],
+      enum: ['USDT', 'BTC', 'ETH', 'SOL'],
       default: 'USDT',
       index: true,
     },

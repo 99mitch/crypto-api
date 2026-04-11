@@ -80,6 +80,17 @@ class QRCodeService {
       const btcAmount = parseFloat(amount.toFixed(8));
       return `bitcoin:${address}?amount=${btcAmount}`;
     }
+    if (currency === 'ETH') {
+      // EIP-681 : ethereum:<address>@1?value=<wei>
+      const { ethers } = require('ethers');
+      const valueWei = ethers.parseEther(amount.toFixed(18)).toString();
+      return `ethereum:${address}@1?value=${valueWei}`;
+    }
+    if (currency === 'SOL') {
+      // Solana Pay URI
+      const solAmount = parseFloat(amount.toFixed(9));
+      return `solana:${address}?amount=${solAmount}`;
+    }
     return address;
   }
 }
