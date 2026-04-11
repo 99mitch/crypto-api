@@ -22,6 +22,7 @@ module.exports = {
   payment: {
     expirationMinutes: parseInt(process.env.PAYMENT_EXPIRATION_MINUTES) || 15,
     checkIntervalSeconds: parseInt(process.env.PAYMENT_CHECK_INTERVAL_SECONDS) || 10,
+    btcCheckIntervalSeconds: parseInt(process.env.BTC_CHECK_INTERVAL_SECONDS) || 30,
     amountTolerance: parseFloat(process.env.PAYMENT_AMOUNT_TOLERANCE) || 0.015,
     gracePeriodSeconds: parseInt(process.env.PAYMENT_GRACE_PERIOD_SECONDS) || 120,
   },

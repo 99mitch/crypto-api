@@ -41,10 +41,10 @@ app.get('/api/health', (req, res) => {
 
 // ===== DASHBOARD REACT (en production) =====
 if (config.nodeEnv === 'production') {
-  app.use(express.static(path.join(__dirname, '../dashboard/build')));
+  app.use(express.static(path.join(__dirname, '../dashboard/dist')));
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(__dirname, '../dashboard/build', 'index.html'));
+      res.sendFile(path.join(__dirname, '../dashboard/dist', 'index.html'));
     }
   });
 }
@@ -68,7 +68,7 @@ async function start() {
     `);
   });
 
-  paymentMonitor.start();
+  await paymentMonitor.start();
 }
 
 start().catch((err) => {

@@ -113,6 +113,40 @@ class AdminController {
   }
 
   /**
+   * POST /api/admin/payments/:paymentId/cancel
+   * Annule un paiement en attente
+   */
+  async cancelPayment(req, res) {
+    try {
+      const payment = await Payment.findOne({ paymentId: req.params.paymentId });
+
+      if (!payment) {
+        return res.status(404).json({ error: 'Paiement non trouvé' });
+      }
+
+      if (payment.status !== 'pending') {
+        return res.status(400).json({
+          error: `Impossible d'annuler un paiement au statut "${payment.status}"`,
+        });
+      }
+
+      payment.status = 'cancelled';
+      await payment.save();
+
+      await AuditLog.log({
+        paymentId: payment.paymentId,
+        action: 'payment_cancelled',
+        req,
+      });
+
+      return res.json({ success: true, payment });
+    } catch (error) {
+      console.error('Erreur cancelPayment:', error);
+      return res.status(500).json({ error: 'Erreur interne' });
+    }
+  }
+
+  /**
    * GET /api/admin/recent-activity
    * Dernières activités (pour le feed en temps réel du dashboard)
    */

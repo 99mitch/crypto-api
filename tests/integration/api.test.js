@@ -15,6 +15,17 @@ jest.mock('../../src/services/tronService', () => ({
   getTRXBalance: jest.fn().mockResolvedValue(100),
 }));
 
+// Mock btcService pour ne pas toucher la vraie blockchain BTC
+jest.mock('../../src/services/btcService', () => ({
+  generateWallet: jest.fn().mockResolvedValue({
+    address: 'bc1mockbtcaddress123456789012345678',
+    wif: 'mock-wif-key',
+  }),
+  getBalance: jest.fn().mockResolvedValue(0),
+  getIncomingTransactions: jest.fn().mockResolvedValue([]),
+  sweep: jest.fn().mockResolvedValue('mock-btc-sweep-tx-hash'),
+}));
+
 // Mock qrCodeService
 jest.mock('../../src/services/qrCodeService', () => ({
   generatePaymentQR: jest.fn().mockResolvedValue('data:image/png;base64,mockQRdata'),
@@ -45,6 +56,13 @@ jest.mock('../../src/config', () => ({
   sweep: { minTrxForGas: 15000000, feeLimit: 30000000 },
   admin: { apiKey: 'test-admin-key', password: 'test-password', secret: 'test-admin-secret' },
   encryption: { masterKey: null }, // Pas de chiffrement dans les tests
+  btc: {
+    network: 'testnet',
+    blockcypherToken: 'test-token',
+    centralWallet: { address: 'bc1testcentral', wif: 'test-wif' },
+    feesWalletAddress: null,
+    payment: { expirationMinutes: 60, requiredConfirmations: 1, amountTolerance: 0.015 },
+  },
 }));
 
 let app;
@@ -296,3 +314,57 @@ describe('GET /api/health', () => {
     expect(res.body.status).toEqual('ok');
   });
 });
+
+describe('POST /api/admin/payments/:paymentId/cancel', () => {
+  it('annule un paiement en attente', async () => {
+    const createRes = await request
+      .post('/api/payments')
+      .send({ amount: 10, currency: 'USDT' })
+    const paymentId = createRes.body.payment.paymentId
+
+    const res = await request
+      .post(`/api/admin/payments/${paymentId}/cancel`)
+      .set(adminHeaders)
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.payment.status).toBe('cancelled')
+  })
+
+  it('retourne 400 si le paiement n\'est pas en attente', async () => {
+    const createRes = await request
+      .post('/api/payments')
+      .send({ amount: 10, currency: 'USDT' })
+    const paymentId = createRes.body.payment.paymentId
+
+    // Cancel once
+    await request
+      .post(`/api/admin/payments/${paymentId}/cancel`)
+      .set(adminHeaders)
+
+    // Try to cancel again
+    const res = await request
+      .post(`/api/admin/payments/${paymentId}/cancel`)
+      .set(adminHeaders)
+
+    expect(res.status).toBe(400)
+  })
+
+  it('retourne 404 pour un paymentId inconnu', async () => {
+    const res = await request
+      .post('/api/admin/payments/PAY-UNKNOWN/cancel')
+      .set(adminHeaders)
+
+    expect(res.status).toBe(404)
+  })
+
+  it('retourne 401 sans authentification', async () => {
+    const createRes = await request
+      .post('/api/payments')
+      .send({ amount: 10, currency: 'USDT' })
+    const paymentId = createRes.body.payment.paymentId
+
+    const res = await request.post(`/api/admin/payments/${paymentId}/cancel`)
+    expect(res.status).toBe(401)
+  })
+})
