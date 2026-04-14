@@ -3,6 +3,8 @@ const Payment = require('../models/Payment');
 const AuditLog = require('../models/AuditLog');
 const tronService = require('./tronService');
 const btcService = require('./btcService');
+const ethService = require('./ethService');
+const solanaService = require('./solanaService');
 const priceService = require('./priceService');
 const qrCodeService = require('./qrCodeService');
 const { encrypt } = require('../utils/encryption');
@@ -11,6 +13,8 @@ const config = require('../config');
 const blockchainServices = {
   USDT: tronService,
   BTC: btcService,
+  ETH: ethService,
+  SOL: solanaService,
 };
 
 class PaymentService {
@@ -43,6 +47,18 @@ class PaymentService {
       cryptoAmount = parseFloat((usdAmount / exchangeRate).toFixed(8));
       requiredConfirmations = config.btc.payment.requiredConfirmations;
       expirationMinutes = config.btc.payment.expirationMinutes;
+    } else if (currency === 'ETH') {
+      exchangeRate = await priceService.getETHRate();
+      usdAmount = amount;
+      cryptoAmount = parseFloat((usdAmount / exchangeRate).toFixed(8));
+      requiredConfirmations = config.eth.payment.requiredConfirmations;
+      expirationMinutes = config.eth.payment.expirationMinutes;
+    } else if (currency === 'SOL') {
+      exchangeRate = await priceService.getSOLRate();
+      usdAmount = amount;
+      cryptoAmount = parseFloat((usdAmount / exchangeRate).toFixed(9));
+      requiredConfirmations = config.solana.payment.requiredConfirmations;
+      expirationMinutes = config.solana.payment.expirationMinutes;
     } else {
       // USDT : taux 1:1 USD
       exchangeRate = 1;
@@ -53,9 +69,16 @@ class PaymentService {
     }
 
     // Générer le wallet dédié
-    const walletData = currency === 'BTC'
-      ? btcService.generateWallet()
-      : await tronService.generateWallet();
+    let walletData;
+    if (currency === 'BTC') {
+      walletData = btcService.generateWallet();
+    } else if (currency === 'ETH') {
+      walletData = ethService.generateWallet();
+    } else if (currency === 'SOL') {
+      walletData = solanaService.generateWallet();
+    } else {
+      walletData = await tronService.generateWallet();
+    }
 
     const walletAddress = walletData.address;
     const rawPrivateKey = currency === 'BTC'
@@ -102,9 +125,9 @@ class PaymentService {
       req,
     });
 
-    const label = currency === 'BTC'
-      ? `${cryptoAmount} BTC (~$${usdAmount} USD)`
-      : `${amount} USDT`;
+    const label = currency === 'USDT'
+      ? `${amount} USDT`
+      : `${cryptoAmount} ${currency} (~$${usdAmount} USD)`;
     console.log(`💳 Paiement créé: ${payment.paymentId} - ${label} → ${walletAddress}`);
 
     return payment.toPublicJSON();

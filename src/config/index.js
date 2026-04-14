@@ -56,6 +56,35 @@ module.exports = {
     },
   },
 
+  eth: {
+    rpcUrl: process.env.ETH_RPC_URL,
+    etherscanApiKey: process.env.ETH_ETHERSCAN_API_KEY || '',
+    centralWallet: {
+      address: process.env.ETH_CENTRAL_WALLET_ADDRESS,
+      privateKey: process.env.ETH_CENTRAL_WALLET_PRIVATE_KEY,
+    },
+    feesWalletAddress: process.env.ETH_FEES_WALLET_ADDRESS || null,
+    payment: {
+      expirationMinutes: parseInt(process.env.ETH_PAYMENT_EXPIRATION_MINUTES) || 60,
+      requiredConfirmations: parseInt(process.env.ETH_REQUIRED_CONFIRMATIONS) || 12,
+      amountTolerance: parseFloat(process.env.ETH_AMOUNT_TOLERANCE) || 0.015,
+    },
+  },
+
+  solana: {
+    rpcUrl: process.env.SOL_RPC_URL || 'https://api.mainnet-beta.solana.com',
+    centralWallet: {
+      address: process.env.SOL_CENTRAL_WALLET_ADDRESS,
+      privateKey: process.env.SOL_CENTRAL_WALLET_PRIVATE_KEY,
+    },
+    feesWalletAddress: process.env.SOL_FEES_WALLET_ADDRESS || null,
+    payment: {
+      expirationMinutes: parseInt(process.env.SOL_PAYMENT_EXPIRATION_MINUTES) || 30,
+      requiredConfirmations: parseInt(process.env.SOL_REQUIRED_CONFIRMATIONS) || 1,
+      amountTolerance: parseFloat(process.env.SOL_AMOUNT_TOLERANCE) || 0.015,
+    },
+  },
+
   admin: {
     apiKey: process.env.ADMIN_API_KEY,
     password: process.env.ADMIN_PASSWORD || 'changeme',
