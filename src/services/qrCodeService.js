@@ -80,6 +80,14 @@ class QRCodeService {
       const btcAmount = parseFloat(amount.toFixed(8));
       return `bitcoin:${address}?amount=${btcAmount}`;
     }
+    if (currency === 'ETH') {
+      const ethAmount = parseFloat(amount.toFixed(18));
+      return `ethereum:${address}?value=${ethAmount}`;
+    }
+    if (currency === 'SOL') {
+      const solAmount = parseFloat(amount.toFixed(9));
+      return `solana:${address}?amount=${solAmount}`;
+    }
     return address;
   }
 }
