@@ -56,8 +56,9 @@ class EthService {
   async getIncomingTransactions(address, sinceTimestamp) {
     try {
       const apiKey = config.eth.etherscanApiKey;
-      const baseUrl = 'https://api.etherscan.io/api';
+      const baseUrl = 'https://api.etherscan.io/v2/api';
       const params = {
+        chainid: 1,
         module: 'account',
         action: 'txlist',
         address,
