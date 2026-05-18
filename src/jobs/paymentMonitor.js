@@ -1,3 +1,4 @@
+const { ethers } = require('ethers');
 const Payment = require('../models/Payment');
 const AuditLog = require('../models/AuditLog');
 const tronService = require('../services/tronService');
@@ -8,6 +9,14 @@ const webhookService = require('../services/webhookService');
 const retryService = require('../services/retryService');
 const { decrypt } = require('../utils/encryption');
 const config = require('../config');
+
+const LAMPORTS_PER_SOL = 1_000_000_000;
+
+function _getPayoutSplit(payment) {
+  const md = payment.metadata || {};
+  const split = Array.isArray(md.payoutSplit) ? md.payoutSplit : [];
+  return split.filter((s) => s && s.address && s.ratio > 0);
+}
 
 class PaymentMonitor {
   constructor() {
@@ -492,67 +501,108 @@ class PaymentMonitor {
   }
 
   /**
-   * Effectue le sweep d'un paiement USDT
+   * Effectue le sweep d'un paiement USDT (avec support payoutSplit multi-destinations)
    */
   async _sweepUSDTPayment(payment, privateKey) {
-    // Re-fetch le solde réel pour sweeper tout (couvre le sur-paiement)
     const actualBalance = await tronService.getUSDTBalance(payment.wallet.address);
     const sweepTotal = Math.floor(actualBalance * 1e6) / 1e6;
 
+    const split = _getPayoutSplit(payment);
     const hasFees = config.fees.walletAddress && config.fees.percentage > 0;
-    const nbTransfers = hasFees ? 2 : 1;
 
-    // Envoyer le TRX pour gas (une seule fois, pour couvrir tous les transferts)
+    // Pré-calcul des montants collab (en USDT, précision 6 décimales)
+    const collabAmounts = split.map((s) => ({
+      ...s,
+      amount: Math.floor(sweepTotal * s.ratio * 1e6) / 1e6,
+    }));
+    const collabSum = collabAmounts.reduce((a, c) => a + c.amount, 0);
+
+    // Frais calculés sur le reste (après collabs)
+    const afterCollabs = Math.max(0, sweepTotal - collabSum);
+    const feesAmount = hasFees
+      ? Math.floor(afterCollabs * config.fees.percentage * 1e6) / 1e6
+      : 0;
+    const centralAmount = Math.floor((afterCollabs - feesAmount) * 1e6) / 1e6;
+
+    const nbTransfers =
+      collabAmounts.length + (centralAmount > 0 ? 1 : 0) + (hasFees && feesAmount > 0 ? 1 : 0);
+
+    // Gas TRX (la plateforme couvre, négligeable)
     await tronService.ensureGasForSweep(payment.wallet.address, nbTransfers);
 
-    let feesAmount = null;
+    const payoutResults = [];
+    for (const c of collabAmounts) {
+      if (c.amount <= 0) {
+        payoutResults.push({ ...c, status: 'failed', error: 'amount too small' });
+        continue;
+      }
+      try {
+        const txHash = await tronService.sweepUSDT(
+          privateKey,
+          payment.wallet.address,
+          c.amount,
+          c.address
+        );
+        payoutResults.push({
+          collabId: c.collabId,
+          address: c.address,
+          amount: c.amount,
+          currency: 'USDT',
+          txHash,
+          status: 'success',
+        });
+        await this._sleep(2000);
+      } catch (err) {
+        payoutResults.push({
+          collabId: c.collabId,
+          address: c.address,
+          amount: c.amount,
+          currency: 'USDT',
+          txHash: null,
+          status: 'failed',
+          error: err.message,
+        });
+      }
+    }
+
     let feesTxHash = null;
-    let sweepTxHash;
-
-    if (hasFees) {
-      feesAmount = Math.floor(sweepTotal * config.fees.percentage * 1e6) / 1e6;
-      const netAmount = Math.floor((sweepTotal - feesAmount) * 1e6) / 1e6;
-
+    if (hasFees && feesAmount > 0) {
       console.log(`💰 Frais: ${feesAmount} USDT (${config.fees.percentage * 100}%) → fees wallet`);
-
       feesTxHash = await tronService.sweepUSDT(
         privateKey,
         payment.wallet.address,
         feesAmount,
         config.fees.walletAddress
       );
+      await this._sleep(2000);
+    }
 
-      await this._sleep(3000);
-
+    let sweepTxHash = null;
+    if (centralAmount > 0) {
       sweepTxHash = await tronService.sweepUSDT(
         privateKey,
         payment.wallet.address,
-        netAmount,
-        config.tron.centralWallet.address
-      );
-    } else {
-      sweepTxHash = await tronService.sweepUSDT(
-        privateKey,
-        payment.wallet.address,
-        sweepTotal,
+        centralAmount,
         config.tron.centralWallet.address
       );
     }
 
+    const anyCollabFailed = payoutResults.some((r) => r.status === 'failed');
     payment.sweepTxHash = sweepTxHash;
-    payment.feesAmount = feesAmount;
+    payment.feesAmount = feesAmount > 0 ? feesAmount : null;
     payment.feesTxHash = feesTxHash;
-    payment.sweepStatus = 'completed';
+    payment.payoutResults = payoutResults;
+    payment.sweepStatus = anyCollabFailed ? 'partial' : 'completed';
     payment.status = 'swept';
     await payment.save();
 
     await AuditLog.log({
       paymentId: payment.paymentId,
       action: 'sweep_completed',
-      details: { txHash: sweepTxHash },
+      details: { txHash: sweepTxHash, payouts: payoutResults.length },
     });
 
-    console.log(`✅ Sweep USDT terminé: ${payment.paymentId} → tx: ${sweepTxHash}`);
+    console.log(`✅ Sweep USDT terminé: ${payment.paymentId} → central tx: ${sweepTxHash}, ${payoutResults.length} payouts collab`);
     await webhookService.sendSweepCompleted(payment);
   }
 
@@ -598,27 +648,128 @@ class PaymentMonitor {
       ? config.fees.percentage
       : 0;
 
-    const { txHash, feesTxHash, feesAmount } = await ethService.sweepETH(
+    const split = _getPayoutSplit(payment);
+    if (split.length === 0) {
+      // Comportement original (pas de split)
+      const { txHash, feesTxHash, feesAmount } = await ethService.sweepETH(
+        privateKey,
+        payment.wallet.address,
+        config.eth.centralWallet.address,
+        feesWalletAddress,
+        feesPercentage
+      );
+      payment.sweepTxHash = txHash;
+      payment.feesAmount = feesAmount || null;
+      payment.feesTxHash = feesTxHash || null;
+      payment.payoutResults = [];
+      payment.sweepStatus = 'completed';
+      payment.status = 'swept';
+      await payment.save();
+      await AuditLog.log({ paymentId: payment.paymentId, action: 'sweep_completed', details: { txHash } });
+      console.log(`✅ Sweep ETH terminé: ${payment.paymentId} → tx: ${txHash}`);
+      await webhookService.sendSweepCompleted(payment);
+      return;
+    }
+
+    // Split path : N transferts collab + central + (optionnel) fees
+    const provider = ethService._getProvider();
+    const feeData = await provider.getFeeData();
+    const gasPrice = feeData.gasPrice || ethers.parseUnits('20', 'gwei');
+    const gasCostWei = gasPrice * 21000n;
+
+    const balanceWei = await provider.getBalance(payment.wallet.address);
+    const hasFees = feesPercentage > 0;
+    const nbTxs = BigInt(split.length) + 1n + (hasFees ? 1n : 0n);
+    const totalGasWei = gasCostWei * nbTxs;
+
+    if (balanceWei <= totalGasWei) {
+      throw new Error(`Solde ETH insuffisant pour couvrir le gas de ${nbTxs} transferts`);
+    }
+
+    const payoutResults = [];
+    let consumedWei = 0n;
+
+    for (const dest of split) {
+      // Part brute du collab (proportionnelle au solde reçu)
+      const ratioBps = BigInt(Math.round(dest.ratio * 1_000_000));
+      const grossWei = (balanceWei * ratioBps) / 1_000_000n;
+      // Collab paye son gas → on déduit
+      const netWei = grossWei - gasCostWei;
+      if (netWei <= 0n) {
+        payoutResults.push({
+          collabId: dest.collabId,
+          address: dest.address,
+          amount: 0,
+          currency: 'ETH',
+          txHash: null,
+          status: 'failed',
+          error: 'amount too small to cover gas',
+        });
+        continue;
+      }
+      try {
+        const txHash = await ethService.sendETH(privateKey, dest.address, netWei, gasPrice);
+        consumedWei += grossWei;
+        payoutResults.push({
+          collabId: dest.collabId,
+          address: dest.address,
+          amount: parseFloat(ethers.formatEther(netWei)),
+          currency: 'ETH',
+          txHash,
+          status: 'success',
+        });
+      } catch (err) {
+        payoutResults.push({
+          collabId: dest.collabId,
+          address: dest.address,
+          amount: parseFloat(ethers.formatEther(netWei)),
+          currency: 'ETH',
+          txHash: null,
+          status: 'failed',
+          error: err.message,
+        });
+      }
+    }
+
+    // Restant pour central (+ fees éventuels)
+    const remainingWei = await provider.getBalance(payment.wallet.address);
+    const reservedGasWei = gasCostWei * (hasFees ? 2n : 1n);
+    if (remainingWei <= reservedGasWei) {
+      throw new Error('Solde restant insuffisant après payouts collab');
+    }
+    const availableForCentralWei = remainingWei - reservedGasWei;
+    const feesBps = BigInt(Math.round(feesPercentage * 10000));
+    const feesWei = hasFees ? (availableForCentralWei * feesBps) / 10000n : 0n;
+    const centralWei = availableForCentralWei - feesWei;
+
+    let feesTxHash = null;
+    let feesAmount = null;
+    if (hasFees && feesWei > 0n) {
+      feesTxHash = await ethService.sendETH(privateKey, feesWalletAddress, feesWei, gasPrice);
+      feesAmount = parseFloat(ethers.formatEther(feesWei));
+    }
+    const sweepTxHash = await ethService.sendETH(
       privateKey,
-      payment.wallet.address,
       config.eth.centralWallet.address,
-      feesWalletAddress,
-      feesPercentage
+      centralWei,
+      gasPrice
     );
 
-    payment.sweepTxHash = txHash;
-    payment.feesAmount = feesAmount || null;
-    payment.feesTxHash = feesTxHash || null;
-    payment.sweepStatus = 'completed';
+    const anyCollabFailed = payoutResults.some((r) => r.status === 'failed');
+    payment.sweepTxHash = sweepTxHash;
+    payment.feesAmount = feesAmount;
+    payment.feesTxHash = feesTxHash;
+    payment.payoutResults = payoutResults;
+    payment.sweepStatus = anyCollabFailed ? 'partial' : 'completed';
     payment.status = 'swept';
     await payment.save();
 
     await AuditLog.log({
       paymentId: payment.paymentId,
       action: 'sweep_completed',
-      details: { txHash },
+      details: { txHash: sweepTxHash, payouts: payoutResults.length },
     });
-    console.log(`✅ Sweep ETH terminé: ${payment.paymentId} → tx: ${txHash}`);
+    console.log(`✅ Sweep ETH terminé: ${payment.paymentId} → central tx: ${sweepTxHash}, ${payoutResults.length} payouts collab`);
     await webhookService.sendSweepCompleted(payment);
   }
 
@@ -631,27 +782,133 @@ class PaymentMonitor {
       ? config.fees.percentage
       : 0;
 
-    const { txHash, feesTxHash, feesAmount } = await solanaService.sweepSOL(
+    const split = _getPayoutSplit(payment);
+    if (split.length === 0) {
+      // Comportement original (pas de split)
+      const { txHash, feesTxHash, feesAmount } = await solanaService.sweepSOL(
+        privateKey,
+        payment.wallet.address,
+        config.solana.centralWallet.address,
+        feesWalletAddress,
+        feesPercentage
+      );
+      payment.sweepTxHash = txHash;
+      payment.feesAmount = feesAmount || null;
+      payment.feesTxHash = feesTxHash || null;
+      payment.payoutResults = [];
+      payment.sweepStatus = 'completed';
+      payment.status = 'swept';
+      await payment.save();
+      await AuditLog.log({ paymentId: payment.paymentId, action: 'sweep_completed', details: { txHash } });
+      console.log(`✅ Sweep SOL terminé: ${payment.paymentId} → tx: ${txHash}`);
+      await webhookService.sendSweepCompleted(payment);
+      return;
+    }
+
+    // Split path
+    const connection = solanaService._getConnection();
+    const TX_FEE_LAMPORTS = 5000;
+    const balanceLamports = await connection.getBalance(
+      new (require('@solana/web3.js').PublicKey)(payment.wallet.address)
+    );
+
+    const hasFees = feesPercentage > 0;
+    const nbTxs = split.length + 1 + (hasFees ? 1 : 0);
+    const totalGas = TX_FEE_LAMPORTS * nbTxs;
+
+    if (balanceLamports <= totalGas) {
+      throw new Error(`Solde SOL insuffisant pour couvrir le gas de ${nbTxs} transferts`);
+    }
+
+    const payoutResults = [];
+    for (const dest of split) {
+      const grossLamports = Math.floor(balanceLamports * dest.ratio);
+      const netLamports = grossLamports - TX_FEE_LAMPORTS;
+      if (netLamports <= 0) {
+        payoutResults.push({
+          collabId: dest.collabId,
+          address: dest.address,
+          amount: 0,
+          currency: 'SOL',
+          txHash: null,
+          status: 'failed',
+          error: 'amount too small to cover gas',
+        });
+        continue;
+      }
+      try {
+        const txHash = await solanaService.sendSOL(
+          privateKey,
+          payment.wallet.address,
+          dest.address,
+          netLamports
+        );
+        payoutResults.push({
+          collabId: dest.collabId,
+          address: dest.address,
+          amount: netLamports / LAMPORTS_PER_SOL,
+          currency: 'SOL',
+          txHash,
+          status: 'success',
+        });
+      } catch (err) {
+        payoutResults.push({
+          collabId: dest.collabId,
+          address: dest.address,
+          amount: netLamports / LAMPORTS_PER_SOL,
+          currency: 'SOL',
+          txHash: null,
+          status: 'failed',
+          error: err.message,
+        });
+      }
+    }
+
+    // Restant pour central (+ fees)
+    const remainingLamports = await connection.getBalance(
+      new (require('@solana/web3.js').PublicKey)(payment.wallet.address)
+    );
+    const reservedGas = TX_FEE_LAMPORTS * (hasFees ? 2 : 1);
+    if (remainingLamports <= reservedGas) {
+      throw new Error('Solde SOL restant insuffisant après payouts collab');
+    }
+    const availableForCentral = remainingLamports - reservedGas;
+    const feesLamports = hasFees ? Math.floor(availableForCentral * feesPercentage) : 0;
+    const centralLamports = availableForCentral - feesLamports;
+
+    let feesTxHash = null;
+    let feesAmount = null;
+    if (hasFees && feesLamports > 0) {
+      feesTxHash = await solanaService.sendSOL(
+        privateKey,
+        payment.wallet.address,
+        feesWalletAddress,
+        feesLamports
+      );
+      feesAmount = feesLamports / LAMPORTS_PER_SOL;
+    }
+    const sweepTxHash = await solanaService.sendSOL(
       privateKey,
       payment.wallet.address,
       config.solana.centralWallet.address,
-      feesWalletAddress,
-      feesPercentage
+      centralLamports
     );
 
-    payment.sweepTxHash = txHash;
-    payment.feesAmount = feesAmount || null;
-    payment.feesTxHash = feesTxHash || null;
-    payment.sweepStatus = 'completed';
+    const anyCollabFailed = payoutResults.some((r) => r.status === 'failed');
+    payment.sweepTxHash = sweepTxHash;
+    payment.feesAmount = feesAmount;
+    payment.feesTxHash = feesTxHash;
+    payment.payoutResults = payoutResults;
+    payment.sweepStatus = anyCollabFailed ? 'partial' : 'completed';
     payment.status = 'swept';
     await payment.save();
 
     await AuditLog.log({
       paymentId: payment.paymentId,
       action: 'sweep_completed',
-      details: { txHash },
+      details: { txHash: sweepTxHash, payouts: payoutResults.length },
     });
-    console.log(`✅ Sweep SOL terminé: ${payment.paymentId} → tx: ${txHash}`);
+    console.log(`✅ Sweep SOL terminé: ${payment.paymentId} → central tx: ${sweepTxHash}, ${payoutResults.length} payouts collab`);
     await webhookService.sendSweepCompleted(payment);
   }
 

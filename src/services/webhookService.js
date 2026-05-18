@@ -70,6 +70,9 @@ class WebhookService {
       amount: payment.receivedAmount,
       usdAmount: payment.usdAmount,
       sweepTxHash: payment.sweepTxHash,
+      sweepStatus: payment.sweepStatus,
+      metadata: payment.metadata,
+      payoutResults: payment.payoutResults || [],
       sweptAt: new Date().toISOString(),
     };
 

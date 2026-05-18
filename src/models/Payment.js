@@ -58,10 +58,29 @@ const paymentSchema = new mongoose.Schema(
     feesTxHash: { type: String, default: null },
     sweepStatus: {
       type: String,
-      enum: ['pending', 'processing', 'completed', 'failed', null],
+      enum: ['pending', 'processing', 'completed', 'failed', 'partial', null],
       default: null,
     },
     sweepRetryCount: { type: Number, default: 0 },
+
+    // Payout split results (multi-destinations vers wallets collab)
+    payoutResults: {
+      type: [
+        new mongoose.Schema(
+          {
+            collabId: { type: Number },
+            address: { type: String, required: true },
+            amount: { type: Number, required: true },
+            currency: { type: String },
+            txHash: { type: String, default: null },
+            status: { type: String, enum: ['success', 'failed'], required: true },
+            error: { type: String, default: null },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
 
     // Refund info
     refundTxHash: { type: String, default: null },

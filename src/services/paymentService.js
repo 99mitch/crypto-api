@@ -32,6 +32,30 @@ class PaymentService {
       throw new Error(`Devise non supportée: ${currency}`);
     }
 
+    // Validation du payoutSplit (si présent dans metadata)
+    if (options.metadata && Array.isArray(options.metadata.payoutSplit)) {
+      const split = options.metadata.payoutSplit;
+      if (currency === 'BTC') {
+        throw new Error('payoutSplit non supporté pour BTC');
+      }
+      let total = 0;
+      for (const dest of split) {
+        if (!dest || typeof dest.address !== 'string' || !dest.address) {
+          throw new Error('payoutSplit: chaque entrée doit avoir une address non vide');
+        }
+        if (typeof dest.ratio !== 'number' || dest.ratio <= 0 || dest.ratio > 1) {
+          throw new Error('payoutSplit: ratio doit être un nombre dans ]0, 1]');
+        }
+        if (dest.currency && String(dest.currency).toUpperCase() !== currency) {
+          throw new Error(`payoutSplit: currency doit matcher ${currency}`);
+        }
+        total += dest.ratio;
+      }
+      if (total > 1.000001) {
+        throw new Error(`payoutSplit: somme des ratios (${total.toFixed(6)}) > 1`);
+      }
+    }
+
     // Idempotence
     if (options.externalRef) {
       const existing = await Payment.findOne({ externalRef: options.externalRef });

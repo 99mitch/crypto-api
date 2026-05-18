@@ -189,6 +189,29 @@ class SolanaService {
     console.log(`SOL Sweep: ${fromAddress} -> ${toAddress} (tx: ${txHash})`);
     return { txHash, feesTxHash, feesAmount };
   }
+
+  /**
+   * Envoi simple d'un montant SOL précis vers une destination.
+   * @param {string} privateKeyHex
+   * @param {string} fromAddress
+   * @param {string} toAddress
+   * @param {number} lamports
+   * @returns {Promise<string>} txHash
+   */
+  async sendSOL(privateKeyHex, fromAddress, toAddress, lamports) {
+    const connection = this._getConnection();
+    const keypair = this._keypairFromHex(privateKeyHex);
+    const fromPubkey = new PublicKey(fromAddress);
+    const toPubkey = new PublicKey(toAddress);
+    const { blockhash } = await connection.getLatestBlockhash();
+    const tx = new Transaction({ recentBlockhash: blockhash, feePayer: fromPubkey }).add(
+      SystemProgram.transfer({ fromPubkey, toPubkey, lamports })
+    );
+    tx.sign(keypair);
+    const txHash = await connection.sendRawTransaction(tx.serialize());
+    await connection.confirmTransaction(txHash, 'confirmed');
+    return txHash;
+  }
 }
 
 module.exports = new SolanaService();
