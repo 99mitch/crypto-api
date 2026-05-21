@@ -99,6 +99,11 @@ const paymentSchema = new mongoose.Schema(
     webhookSentAt: { type: Date, default: null },
     webhookAttempts: { type: Number, default: 0 },
 
+    // URL de callback dédié pour ce paiement (override de WEBHOOK_INTERNAL_URL).
+    // Permet à plusieurs consommateurs (auto-shop, bot, etc.) de recevoir leurs
+    // propres webhooks sans interférence.
+    callbackUrl: { type: String, default: null },
+
     // Métadonnées libres (orderId, userId, etc.)
     metadata: {
       type: mongoose.Schema.Types.Mixed,

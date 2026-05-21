@@ -27,8 +27,14 @@ class WebhookService {
     // Signature HMAC pour vérification
     const signature = this._sign(payload);
 
+    const url = payment.callbackUrl || config.webhook.internalUrl;
+    if (!url) {
+      console.warn(`⚠️ Aucune URL de webhook configurée pour ${payment.paymentId}`);
+      return;
+    }
+
     try {
-      await axios.post(config.webhook.internalUrl, payload, {
+      await axios.post(url, payload, {
         headers: {
           'Content-Type': 'application/json',
           'X-Webhook-Signature': signature,
@@ -43,7 +49,7 @@ class WebhookService {
         $inc: { webhookAttempts: 1 },
       });
 
-      console.log(`📨 Webhook envoyé pour ${payment.paymentId}`);
+      console.log(`📨 Webhook envoyé pour ${payment.paymentId} → ${url}`);
     } catch (error) {
       console.error(`❌ Webhook échoué pour ${payment.paymentId}:`, error.message);
 
@@ -78,8 +84,14 @@ class WebhookService {
 
     const signature = this._sign(payload);
 
+    const url = payment.callbackUrl || config.webhook.internalUrl;
+    if (!url) {
+      console.warn(`⚠️ Aucune URL de webhook sweep configurée pour ${payment.paymentId}`);
+      return;
+    }
+
     try {
-      await axios.post(config.webhook.internalUrl, payload, {
+      await axios.post(url, payload, {
         headers: {
           'Content-Type': 'application/json',
           'X-Webhook-Signature': signature,
@@ -88,7 +100,7 @@ class WebhookService {
         timeout: 10000,
       });
 
-      console.log(`📨 Webhook sweep envoyé pour ${payment.paymentId}`);
+      console.log(`📨 Webhook sweep envoyé pour ${payment.paymentId} → ${url}`);
     } catch (error) {
       console.error(`❌ Webhook sweep échoué pour ${payment.paymentId}:`, error.message);
     }

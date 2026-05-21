@@ -141,6 +141,7 @@ class PaymentService {
       metadata: options.metadata || {},
       description: options.description || '',
       externalRef: options.externalRef || null,
+      callbackUrl: options.callbackUrl || null,
     });
 
     await AuditLog.log({

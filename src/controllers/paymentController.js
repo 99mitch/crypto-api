@@ -7,7 +7,7 @@ class PaymentController {
    */
   async create(req, res) {
     try {
-      const { amount, currency = 'USDT', metadata, description, externalRef } = req.body;
+      const { amount, currency = 'USDT', metadata, description, externalRef, callbackUrl } = req.body;
       const normalizedCurrency = currency.toUpperCase();
 
       if (!['USDT', 'ETH', 'SOL', 'BTC'].includes(normalizedCurrency)) {
@@ -24,11 +24,23 @@ class PaymentController {
         return res.status(400).json({ error: 'Montant minimum: 0.01 USDT' });
       }
 
+      if (callbackUrl != null) {
+        try {
+          const u = new URL(callbackUrl);
+          if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+            return res.status(400).json({ error: 'callbackUrl doit utiliser http:// ou https://' });
+          }
+        } catch {
+          return res.status(400).json({ error: 'callbackUrl invalide' });
+        }
+      }
+
       const payment = await paymentService.createPayment(amount, {
         currency: normalizedCurrency,
         metadata,
         description,
         externalRef,
+        callbackUrl,
       }, req);
 
       return res.status(201).json({ success: true, payment });
